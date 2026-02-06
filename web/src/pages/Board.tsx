@@ -1,0 +1,98 @@
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import BoardColumn from "../components/BoardColumn";
+
+type Status = "waiting" | "playing" | "done";
+
+type BoardEntry = {
+  id: string;
+  nickname: string;
+  status: Status;
+  createdAt: string;
+};
+
+type BoardData = {
+  waiting: BoardEntry[];
+  playing: BoardEntry[];
+  done: BoardEntry[];
+};
+
+async function fetchBoard(): Promise<BoardData> {
+  const res = await fetch("/api/board");
+  if (!res.ok) throw new Error("보드 조회 실패");
+  return res.json();
+}
+
+async function moveEntry(id: string, status: Status): Promise<BoardEntry> {
+  const res = await fetch(`/api/board/entries/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error("이동 실패");
+  return res.json();
+}
+
+const COLUMNS: { id: Status; title: string }[] = [
+  { id: "waiting", title: "대기중" },
+  { id: "playing", title: "게임중" },
+  { id: "done", title: "게임 종료" },
+];
+
+export default function Board() {
+  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Status }) => moveEntry(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board"] }),
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const status = over.id as Status;
+    if (!COLUMNS.some((c) => c.id === status)) return;
+    const id = active.id as string;
+    mutation.mutate({ id, status });
+  }
+
+  if (isLoading) return <div className="p-8 text-slate-400">보드 로딩 중...</div>;
+  if (error) return <div className="p-8 text-red-400">보드 조회 실패 (localhost에서만 접속 가능)</div>;
+  if (!data) return null;
+
+  return (
+    <div className="min-h-screen p-4 md:p-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold">운영 보드</h1>
+        <p className="text-slate-400 text-sm mt-1">localhost 전용 · 드래그하여 상태 이동 · 당일(KST)까지 유지</p>
+      </header>
+      <DndContext
+        sensors={sensors}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {COLUMNS.map((col) => (
+            <BoardColumn
+              key={col.id}
+              id={col.id}
+              title={col.title}
+              entries={data[col.id] ?? []}
+            />
+          ))}
+        </div>
+      </DndContext>
+    </div>
+  );
+}
