@@ -43,7 +43,11 @@ export function startIngestPoll(log: { info: (o: unknown) => void; warn: (o: unk
   const intervalMs = config.POLL_INTERVAL_MS;
   let lastSize = 0;
 
+  const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/f5f9e2b5-6e29-44c2-98b6-e53c33291b35";
   async function tick(): Promise<void> {
+    // #region agent log
+    fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "poll.ts:tick", message: "tick started", data: {}, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H3" }) }).catch(() => {});
+    // #endregion
     if (!existsSync(path)) {
       lastSize = 0;
       return;
@@ -54,6 +58,9 @@ export function startIngestPoll(log: { info: (o: unknown) => void; warn: (o: unk
       lastSize = 0;
       return;
     }
+    // #region agent log
+    fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "poll.ts:before getCheckpointOffset", message: "calling getCheckpointOffset", data: { size }, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H3" }) }).catch(() => {});
+    // #endregion
     const offset = await getCheckpointOffset();
     if (size > offset) {
       const newMatches: MatchLine[] = [];
@@ -85,6 +92,9 @@ export function startIngestPoll(log: { info: (o: unknown) => void; warn: (o: unk
     try {
       await tick();
     } catch (e) {
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "poll.ts:tick catch", message: "tick error", data: { err: String(e), stack: (e as Error)?.stack }, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H3" }) }).catch(() => {});
+      // #endregion
       log.warn({ err: e });
     }
   }, intervalMs);
