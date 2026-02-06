@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -7,6 +8,7 @@ import {
 } from "@dnd-kit/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BoardColumn from "../components/BoardColumn";
+import LogPopup from "../components/LogPopup";
 
 type Status = "waiting" | "playing" | "done";
 
@@ -46,6 +48,7 @@ const COLUMNS: { id: Status; title: string }[] = [
 ];
 
 export default function Board() {
+  const [logsOpen, setLogsOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
   const mutation = useMutation({
@@ -93,6 +96,14 @@ export default function Board() {
           ))}
         </div>
       </DndContext>
+      <button
+        type="button"
+        onClick={() => setLogsOpen(true)}
+        className="fixed bottom-4 right-4 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-slate-300 border border-white/10 hover:bg-white/15"
+      >
+        Logs
+      </button>
+      <LogPopup isOpen={logsOpen} onClose={() => setLogsOpen(false)} />
     </div>
   );
 }

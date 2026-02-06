@@ -1,0 +1,61 @@
+import { Writable } from "stream";
+const MAX_LOGS = 500;
+const DEFAULT_LIMIT = 200;
+const buffer = [];
+let remainder = "";
+function levelName(level) {
+    if (level >= 60)
+        return "error";
+    if (level >= 50)
+        return "warn";
+    if (level >= 40)
+        return "info";
+    if (level >= 30)
+        return "debug";
+    return "trace";
+}
+function parseLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed)
+        return null;
+    try {
+        const raw = JSON.parse(trimmed);
+        const entry = {
+            level: typeof raw.level === "number" ? raw.level : 30,
+            time: typeof raw.time === "number" ? raw.time : Date.now(),
+            msg: typeof raw.msg === "string" ? raw.msg : "",
+        };
+        for (const [k, v] of Object.entries(raw)) {
+            if (k !== "level" && k !== "time" && k !== "msg")
+                entry[k] = v;
+        }
+        return entry;
+    }
+    catch {
+        return null;
+    }
+}
+export const logBufferStream = new Writable({
+    write(chunk, _enc, cb) {
+        const str = remainder + chunk.toString("utf-8");
+        const lines = str.split("\n");
+        remainder = lines.pop() ?? "";
+        for (const line of lines) {
+            const entry = parseLine(line);
+            if (entry) {
+                buffer.push(entry);
+                if (buffer.length > MAX_LOGS)
+                    buffer.shift();
+            }
+        }
+        cb();
+    },
+});
+export function getRecentLogs(limit = DEFAULT_LIMIT) {
+    const n = Math.min(limit, buffer.length);
+    const out = buffer.slice(-n).map((e) => ({
+        ...e,
+        levelName: levelName(e.level),
+    }));
+    return out.reverse();
+}
