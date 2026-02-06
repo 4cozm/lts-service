@@ -79,7 +79,7 @@ export default function Board() {
     <div className="min-h-screen p-4 md:p-6">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold">운영 보드</h1>
-        <p className="text-slate-400 text-sm mt-1">localhost 전용 · 드래그하여 상태 이동 · 당일(KST)까지 유지</p>
+        <p className="text-slate-400 text-sm mt-1">localhost 전용, 무인증 · 드래그하여 상태 이동 · 당일(KST)까지 유지</p>
       </header>
       <DndContext
         sensors={sensors}
