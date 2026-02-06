@@ -24,7 +24,7 @@ export default function BoardCard({ entry }: { entry: Entry }) {
       {...listeners}
       {...attributes}
       className={`p-3 rounded-lg bg-white/5 border border-white/10 cursor-grab active:cursor-grabbing ${
-        isDragging ? "opacity-80 shadow-lg" : ""
+        isDragging ? "opacity-0" : ""
       }`}
     >
       <span className="font-medium">{entry.nickname}</span>

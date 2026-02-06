@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -47,8 +49,17 @@ const COLUMNS: { id: Status; title: string }[] = [
   { id: "done", title: "게임 종료" },
 ];
 
+function findEntry(data: BoardData, id: string): BoardEntry | null {
+  for (const col of COLUMNS) {
+    const entry = (data[col.id] ?? []).find((e) => e.id === id);
+    if (entry) return entry;
+  }
+  return null;
+}
+
 export default function Board() {
   const [logsOpen, setLogsOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
   const mutation = useMutation({
@@ -62,14 +73,21 @@ export default function Board() {
     })
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveId(null);
     if (!over) return;
     const status = over.id as Status;
     if (!COLUMNS.some((c) => c.id === status)) return;
     const id = active.id as string;
     mutation.mutate({ id, status });
   }
+
+  const activeEntry = data && activeId ? findEntry(data, activeId) : null;
 
   if (isLoading) return <div className="p-8 text-slate-400">보드 로딩 중...</div>;
   if (error) return <div className="p-8 text-red-400">보드 조회 실패 (localhost에서만 접속 가능)</div>;
@@ -83,6 +101,7 @@ export default function Board() {
       </header>
       <DndContext
         sensors={sensors}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -95,6 +114,14 @@ export default function Board() {
             />
           ))}
         </div>
+        <DragOverlay dropAnimation={null} style={{ zIndex: 1000 }}>
+          {activeEntry ? (
+            <div className="p-3 rounded-lg bg-white/10 border border-cyan-500/40 cursor-grabbing shadow-lg">
+              <span className="font-medium">{activeEntry.nickname}</span>
+              <span className="text-slate-500 text-xs ml-2">#{activeEntry.id.slice(0, 8)}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
       <button
         type="button"
