@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRedis } from "../redis.js";
-import { getTodayBoardKey } from "../lib/boardKey.js";
+import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
+
+const MATCH_IDS_SET = "match:ids";
+const MATCHES_KEY_PREFIX = "match:";
 
 const WAITING = "waiting";
 const PLAYING = "playing";
@@ -51,6 +54,39 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
       byStatus[e.status].push(e);
     }
     return reply.send(byStatus);
+  });
+
+  app.get("/api/board/matches", async (req: FastifyRequest, reply: FastifyReply) => {
+    const redis = getRedis();
+    const ids = await redis.smembers(MATCH_IDS_SET);
+    const todayKst = getTodayDateString();
+    const matches: Record<string, unknown>[] = [];
+    for (const id of ids) {
+      const raw = await redis.get(`${MATCHES_KEY_PREFIX}${id}`);
+      if (!raw) continue;
+      try {
+        const obj = JSON.parse(raw) as Record<string, unknown> & { FinishTime?: string };
+        const ft = obj.FinishTime;
+        if (!ft || typeof ft !== "string") continue;
+        const finishMs = new Date(ft).getTime();
+        if (Number.isNaN(finishMs)) continue;
+        const kstDate = new Date(finishMs + 9 * 60 * 60 * 1000);
+        const y = kstDate.getUTCFullYear();
+        const mth = String(kstDate.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(kstDate.getUTCDate()).padStart(2, "0");
+        const dateStr = `${y}-${mth}-${d}`;
+        if (dateStr !== todayKst) continue;
+        matches.push(obj);
+      } catch {
+        continue;
+      }
+    }
+    matches.sort((a, b) => {
+      const ta = (a.FinishTime as string) ?? "";
+      const tb = (b.FinishTime as string) ?? "";
+      return tb.localeCompare(ta);
+    });
+    return reply.send({ matches });
   });
 
   app.patch<{

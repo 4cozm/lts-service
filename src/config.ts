@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(5179),
-  BIND_HOST: z.string().default("127.0.0.1"),
+  BIND_HOST: z.string().default("0.0.0.0"),
   MATCH_RESULTS_PATH: z.string().default("./data/matchResults.jsonl"),
   PLAYERS_PATH: z.string().default("./data/players.json"),
   POLL_INTERVAL_MS: z.coerce.number().default(1000),

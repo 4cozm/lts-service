@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -11,6 +11,15 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BoardColumn from "../components/BoardColumn";
 import LogPopup from "../components/LogPopup";
+import MatchDetailModal from "../components/MatchDetailModal";
+
+type MatchRecord = Record<string, unknown> & {
+  Id?: string | number;
+  Name?: string;
+  FinishTime?: string;
+  Teams?: { Red?: { score?: number }; Blue?: { score?: number } };
+  Result?: { winSide?: string };
+};
 
 type Status = "waiting" | "playing" | "done";
 
@@ -57,11 +66,45 @@ function findEntry(data: BoardData, id: string): BoardEntry | null {
   return null;
 }
 
+async function fetchBoardMatches(): Promise<{ matches: MatchRecord[] }> {
+  const res = await fetch("/api/board/matches");
+  if (!res.ok) throw new Error("경기 목록 조회 실패");
+  return res.json();
+}
+
+function formatFinishTime(s: string | undefined): string {
+  if (!s) return "-";
+  try {
+    return new Date(s).toLocaleTimeString("ko-KR", { hour12: false });
+  } catch {
+    return String(s);
+  }
+}
+
 export default function Board() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [detailMatch, setDetailMatch] = useState<MatchRecord | null>(null);
+  const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
+  const {
+    data: matchesData,
+    isLoading: matchesLoading,
+    refetch: refetchMatches,
+  } = useQuery({
+    queryKey: ["board-matches"],
+    queryFn: fetchBoardMatches,
+    refetchInterval: false,
+  });
+  const toggleMatchSelection = useCallback((id: string) => {
+    setSelectedMatchIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Status }) => moveEntry(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board"] }),
@@ -123,6 +166,72 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <section className="mt-8 glass rounded-xl p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold">경기 기록</h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => refetchMatches()}
+              className="btn-primary py-2 px-3 text-sm"
+            >
+              새로고침
+            </button>
+            <button
+              type="button"
+              className="rounded-lg px-3 py-2 text-sm font-medium bg-slate-500/20 text-slate-300 border border-slate-500/30"
+              onClick={() => {}}
+            >
+              발행
+            </button>
+          </div>
+        </div>
+        <div className="h-64 overflow-y-auto border border-white/10 rounded-lg">
+          {matchesLoading ? (
+            <div className="p-4 text-slate-500">로딩 중...</div>
+          ) : !matchesData?.matches?.length ? (
+            <div className="p-4 text-slate-500">당일 경기 기록이 없습니다.</div>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {matchesData.matches.map((match) => {
+                const id = String(match.Id ?? "");
+                const isSelected = selectedMatchIds.has(id);
+                return (
+                  <li
+                    key={id}
+                    className="flex items-center gap-2 p-2 hover:bg-white/5 cursor-pointer"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+                      setDetailMatch(match);
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleMatchSelection(id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded"
+                    />
+                    <span className="font-mono text-xs text-slate-500 w-20 truncate">{id}</span>
+                    <span className="flex-1 truncate">{String(match.Name ?? "-")}</span>
+                    <span className="text-slate-400 text-xs">{formatFinishTime(match.FinishTime as string)}</span>
+                    <span className="text-xs">
+                      {match.Teams?.Red?.score ?? "-"} : {match.Teams?.Blue?.score ?? "-"}
+                    </span>
+                    {match.Result?.winSide != null && (
+                      <span className="text-cyan-400 text-xs">{match.Result.winSide}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <MatchDetailModal match={detailMatch} onClose={() => setDetailMatch(null)} />
+
       <button
         type="button"
         onClick={() => setLogsOpen(true)}
