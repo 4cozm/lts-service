@@ -2,10 +2,8 @@
 
 ## 프로세스 역할
 ### 1) Ingest
-- 입력: matchResults.jsonl
-- 트리거: 파일 mtime/size 변화(참고용)
-- 정합성: `offset checkpoint`로 증분 읽기
-- 출력: match 단위 이벤트(신규 match)
+- **file 모드**: 입력 matchResults.jsonl. 트리거: 파일 size 변화. 정합성: `offset checkpoint`로 증분 읽기. 출력: match 단위 Redis 기록.
+- **stream 모드**: 입력 Redis Stream(키 예: lts:match:ingest). C# 브릿지가 LiteDB 파일 크기 변화 시 슬림 경기를 XADD. Node는 XREAD BLOCK로 구독해 동일한 match 기록 로직 적용. 체크포인트: 스트림 lastId.
 
 ### 2) Derive/Index(최소)
 - 원본 match에서 OP.GG 스타일 최소 조회를 위해 아래 인덱스를 생성/업로드:

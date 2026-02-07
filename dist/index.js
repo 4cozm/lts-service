@@ -2,6 +2,7 @@ import "dotenv/config";
 import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { startIngestPoll } from "./ingest/poll.js";
+import { startIngestFromStream } from "./ingest/streamIngest.js";
 const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/f5f9e2b5-6e29-44c2-98b6-e53c33291b35";
 async function main() {
     // #region agent log
@@ -12,7 +13,12 @@ async function main() {
     fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "index.ts:after buildApp", message: "buildApp done", data: {}, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H2" }) }).catch(() => { });
     // #endregion
     const log = app.log;
-    startIngestPoll(log);
+    if (config.INGEST_SOURCE === "stream") {
+        startIngestFromStream(log);
+    }
+    else {
+        startIngestPoll(log);
+    }
     // #region agent log
     fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "index.ts:before listen", message: "before app.listen", data: { port: config.PORT }, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H5" }) }).catch(() => { });
     // #endregion

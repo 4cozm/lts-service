@@ -6,6 +6,8 @@ declare const envSchema: z.ZodObject<{
     MATCH_RESULTS_PATH: z.ZodDefault<z.ZodString>;
     PLAYERS_PATH: z.ZodDefault<z.ZodString>;
     POLL_INTERVAL_MS: z.ZodDefault<z.ZodNumber>;
+    INGEST_SOURCE: z.ZodDefault<z.ZodEnum<["file", "stream"]>>;
+    INGEST_STREAM_KEY: z.ZodDefault<z.ZodString>;
     STAFF_ID: z.ZodString;
     STAFF_PW: z.ZodString;
     JWT_SECRET: z.ZodString;
@@ -20,6 +22,8 @@ declare const envSchema: z.ZodObject<{
     MATCH_RESULTS_PATH: string;
     PLAYERS_PATH: string;
     POLL_INTERVAL_MS: number;
+    INGEST_SOURCE: "file" | "stream";
+    INGEST_STREAM_KEY: string;
     STAFF_ID: string;
     STAFF_PW: string;
     JWT_SECRET: string;
@@ -38,6 +42,8 @@ declare const envSchema: z.ZodObject<{
     MATCH_RESULTS_PATH?: string | undefined;
     PLAYERS_PATH?: string | undefined;
     POLL_INTERVAL_MS?: number | undefined;
+    INGEST_SOURCE?: "file" | "stream" | undefined;
+    INGEST_STREAM_KEY?: string | undefined;
     JWT_EXPIRES_IN?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
@@ -50,6 +56,8 @@ export declare const config: {
     MATCH_RESULTS_PATH: string;
     PLAYERS_PATH: string;
     POLL_INTERVAL_MS: number;
+    INGEST_SOURCE: "file" | "stream";
+    INGEST_STREAM_KEY: string;
     STAFF_ID: string;
     STAFF_PW: string;
     JWT_SECRET: string;

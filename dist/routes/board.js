@@ -1,5 +1,7 @@
 import { getRedis } from "../redis.js";
-import { getTodayBoardKey } from "../lib/boardKey.js";
+import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
+const MATCH_IDS_SET = "match:ids";
+const MATCHES_KEY_PREFIX = "match:";
 const WAITING = "waiting";
 const PLAYING = "playing";
 const DONE = "done";
@@ -41,6 +43,43 @@ export async function boardRoutes(app) {
             byStatus[e.status].push(e);
         }
         return reply.send(byStatus);
+    });
+    app.get("/api/board/matches", async (req, reply) => {
+        const redis = getRedis();
+        const ids = await redis.smembers(MATCH_IDS_SET);
+        const todayKst = getTodayDateString();
+        const matches = [];
+        for (const id of ids) {
+            const raw = await redis.get(`${MATCHES_KEY_PREFIX}${id}`);
+            if (!raw)
+                continue;
+            try {
+                const obj = JSON.parse(raw);
+                const ft = obj.FinishTime;
+                if (!ft || typeof ft !== "string")
+                    continue;
+                const finishMs = new Date(ft).getTime();
+                if (Number.isNaN(finishMs))
+                    continue;
+                const kstDate = new Date(finishMs + 9 * 60 * 60 * 1000);
+                const y = kstDate.getUTCFullYear();
+                const mth = String(kstDate.getUTCMonth() + 1).padStart(2, "0");
+                const d = String(kstDate.getUTCDate()).padStart(2, "0");
+                const dateStr = `${y}-${mth}-${d}`;
+                if (dateStr !== todayKst)
+                    continue;
+                matches.push(obj);
+            }
+            catch {
+                continue;
+            }
+        }
+        matches.sort((a, b) => {
+            const ta = a.FinishTime ?? "";
+            const tb = b.FinishTime ?? "";
+            return tb.localeCompare(ta);
+        });
+        return reply.send({ matches });
     });
     app.patch("/api/board/entries/:id", {
         schema: {

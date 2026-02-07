@@ -1,7 +1,7 @@
 export declare const JWT_OPTIONS: {
-    secret: any;
+    secret: string;
     sign: {
-        expiresIn: any;
+        expiresIn: string;
     };
 };
 export type StaffPayload = {

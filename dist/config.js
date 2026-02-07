@@ -1,11 +1,18 @@
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 import { z } from "zod";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 const envSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: z.coerce.number().default(5179),
-    BIND_HOST: z.string().default("127.0.0.1"),
+    BIND_HOST: z.string().default("0.0.0.0"),
     MATCH_RESULTS_PATH: z.string().default("./data/matchResults.jsonl"),
     PLAYERS_PATH: z.string().default("./data/players.json"),
     POLL_INTERVAL_MS: z.coerce.number().default(1000),
+    INGEST_SOURCE: z.enum(["file", "stream"]).default("file"),
+    INGEST_STREAM_KEY: z.string().default("lts:match:ingest"),
     STAFF_ID: z.string().min(1),
     STAFF_PW: z.string().min(1),
     JWT_SECRET: z.string().min(1),
@@ -22,6 +29,8 @@ function loadEnv() {
         MATCH_RESULTS_PATH: process.env.MATCH_RESULTS_PATH,
         PLAYERS_PATH: process.env.PLAYERS_PATH,
         POLL_INTERVAL_MS: process.env.POLL_INTERVAL_MS,
+        INGEST_SOURCE: process.env.INGEST_SOURCE,
+        INGEST_STREAM_KEY: process.env.INGEST_STREAM_KEY,
         STAFF_ID: process.env.STAFF_ID,
         STAFF_PW: process.env.STAFF_PW,
         JWT_SECRET: process.env.JWT_SECRET,

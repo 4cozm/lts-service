@@ -5,7 +5,7 @@ Fastify + ioredis + firebase-admin + zod 기반 로컬 서버 뼈대.
 
 ## 기능 요약
 
-- **JSONL match 파일**: 오프셋 체크포인트로 증분 처리(멱등). match 파일이 변할 때만 players 파일 읽어 보조 매핑용으로 사용.
+- **경기 수집(ingest)**: `INGEST_SOURCE=file`(기본)이면 JSONL match 파일을 오프셋 체크포인트로 증분 처리. `INGEST_SOURCE=stream`이면 Redis Stream을 블로킹 구독해 C# 브릿지가 보낸 경기만 처리. match 소스가 변할 때만 players 파일을 읽어 보조 매핑.
 - **직원 로그인**: JWT 7일. `.env`의 STAFF_ID/STAFF_PW(테스트용 평문).
 - **모바일 닉네임 등록**: 직원 인증 후 닉네임 등록, nickKey 기준 중복 방지.
 - **운영 보드**: localhost 전용 무인증, 대기중/게임중/게임종료 드래그&드롭, 당일(KST 00:00)까지 유지.
@@ -39,11 +39,25 @@ npm run dev:web
 
 운영 보드 API(`/api/board`, `/api/board/entries/:id`)는 127.0.0.1에서만 접근 가능합니다.
 
+## Redis Stream + C# 브릿지 (선택)
+
+LiteDB에서 경기를 읽어 Redis Stream으로 보내려면 C# 브릿지를 별도 실행한다.
+
+1. `.env`에 `INGEST_SOURCE=stream`, `INGEST_STREAM_KEY=lts:match:ingest` 설정.
+2. Node는 기동 시 해당 스트림을 블로킹 구독하며, C#가 XADD한 `payload`(경기 JSON)를 처리한다.
+3. C# 브릿지 실행(환경 변수: `REDIS_URL`, `LITEDB_PATH`, `INGEST_STREAM_KEY`, `POLL_INTERVAL_MS` 등):
+
+```bash
+cd ingest-bridge && dotnet run
+```
+
+LiteDB 파일 크기 변화를 주기적으로 감지해, 변경 시 슬림 경기 요약을 스트림에 넣는다. Node와 동일한 Redis를 사용해야 한다.
+
 ## 스크립트
 
 | 스크립트 | 설명 |
 |---------|------|
-| `npm run dev` | 백엔드 tsx watch (API + ingest 폴링) |
+| `npm run dev` | 백엔드 tsx watch (API + ingest) |
 | `npm run build` | 백엔드 tsc 빌드 |
 | `npm start` | 빌드된 백엔드 실행 |
 | `npm run dev:web` | 프론트 Vite 개발 서버 |

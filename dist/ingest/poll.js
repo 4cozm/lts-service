@@ -7,7 +7,7 @@ import { parseMatchLine } from "./matchSchema.js";
 import { loadPlayersSnapshot } from "./players.js";
 const MATCHES_KEY_PREFIX = "match:";
 const MATCH_IDS_SET = "match:ids";
-async function processNewMatches(matches, log) {
+export async function processNewMatches(matches, log) {
     if (matches.length === 0)
         return;
     const redis = getRedis();
@@ -15,7 +15,7 @@ async function processNewMatches(matches, log) {
     for (const m of matches) {
         const id = String(m.Id);
         pipeline.sadd(MATCH_IDS_SET, id);
-        pipeline.set(`${MATCHES_KEY_PREFIX}${id}`, JSON.stringify(m), "NX");
+        pipeline.set(`${MATCHES_KEY_PREFIX}${id}`, JSON.stringify(m));
     }
     await pipeline.exec();
     log.info({ count: matches.length, ids: matches.map((m) => m.Id) });
@@ -24,7 +24,7 @@ async function processNewMatches(matches, log) {
  * Match 파일이 변했을 때만 players 로드 후 보조 매핑용으로 사용.
  * (현재 뼈대에서는 Redis에 players 스냅샷 저장만 하고, 인덱싱 시 참조 가능하게 함)
  */
-async function onMatchFileChanged(log) {
+export async function onMatchFileChanged(log) {
     const { snapshot, changed } = await loadPlayersSnapshot();
     if (changed && snapshot.length > 0) {
         const redis = getRedis();

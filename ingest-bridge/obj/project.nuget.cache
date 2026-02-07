@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "dgSpecHash": "V3vSOKpfDDw=",
+  "success": true,
+  "projectFilePath": "/Users/hong-geol/Documents/GitHub/lts-service/ingest-bridge/LtsIngestBridge.csproj",
+  "expectedPackageFiles": [
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/litedb/5.0.21/litedb.5.0.21.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/microsoft.extensions.logging.abstractions/6.0.0/microsoft.extensions.logging.abstractions.6.0.0.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/pipelines.sockets.unofficial/2.2.8/pipelines.sockets.unofficial.2.2.8.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/stackexchange.redis/2.8.16/stackexchange.redis.2.8.16.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/system.buffers/4.5.1/system.buffers.4.5.1.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/system.io.pipelines/5.0.1/system.io.pipelines.5.0.1.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/microsoft.netcore.app.ref/8.0.22/microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512",
+    "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget/microsoft.netcore.app.host.osx-x64/8.0.22/microsoft.netcore.app.host.osx-x64.8.0.22.nupkg.sha512"
+  ],
+  "logs": []
+}
