@@ -17,6 +17,28 @@ internal static class Program
     private const int DefaultPollIntervalMs = 2000;
     private const string RedisConnection = "127.0.0.1:6379";
 
+    // #region agent log
+    private static void DebugLog(string location, string message, object? data, string hypothesisId)
+    {
+        try
+        {
+            var logPath = Path.Combine(Environment.CurrentDirectory, ".cursor", "debug.log");
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            var line = STJ.JsonSerializer.Serialize(new Dictionary<string, object?>
+            {
+                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ["location"] = location,
+                ["message"] = message,
+                ["data"] = data,
+                ["hypothesisId"] = hypothesisId
+            }) + "\n";
+            File.AppendAllText(logPath, line);
+        }
+        catch { /* ignore */ }
+    }
+    // #endregion
+
     private static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
@@ -26,12 +48,21 @@ internal static class Program
 
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
         // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용. ref와 동일하게 파일 경로로만 접근.
-        var dbPath = NormalizePath(Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH")
-            ?? Environment.GetEnvironmentVariable("LITEDB_PATH"));
+        var rawArena = Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH");
+        var rawLegacy = Environment.GetEnvironmentVariable("LITEDB_PATH");
+        // #region agent log
+        DebugLog("Program.Main", "env before normalize", new Dictionary<string, object?> { ["LITEDB_ARENA_PATH"] = rawArena, ["LITEDB_PATH"] = rawLegacy, ["arenaLen"] = rawArena?.Length ?? 0, ["legacyLen"] = rawLegacy?.Length ?? 0 }, "H1");
+        // #endregion
+        var dbPath = NormalizePath(rawArena ?? rawLegacy);
         var pollMs = int.TryParse(Environment.GetEnvironmentVariable("POLL_INTERVAL_MS"), out var ms) ? ms : DefaultPollIntervalMs;
         var passwordRaw = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
         var password = string.IsNullOrWhiteSpace(passwordRaw) ? null : passwordRaw!.Trim();
         var collectionName = Environment.GetEnvironmentVariable("GAME_COLLECTION_NAME") ?? DefaultCollectionName;
+
+        // #region agent log
+        DebugLog("Program.Main", "after normalize and password", new Dictionary<string, object?> { ["dbPath"] = dbPath, ["dbPathLength"] = dbPath?.Length ?? 0, ["fileExists"] = dbPath != null && File.Exists(dbPath), ["passwordIsNull"] = password == null, ["passwordLength"] = password?.Length ?? 0 }, "H1");
+        DebugLog("Program.Main", "path for H2", new Dictionary<string, object?> { ["resolvedPath"] = dbPath != null ? Path.GetFullPath(dbPath) : null }, "H2");
+        // #endregion
 
         if (string.IsNullOrWhiteSpace(dbPath))
         {
@@ -90,10 +121,20 @@ internal static class Program
 
     private static int PushSlimGameResultsToStream(IDatabase redisDb, string dbPath, string? password, string collectionName, string streamKey)
     {
+        // #region agent log
+        DebugLog("PushSlimGameResultsToStream", "entry", new Dictionary<string, object?> { ["dbPath"] = dbPath, ["passwordIsNull"] = password == null, ["passwordLen"] = password?.Length ?? 0 }, "H3");
+        // #endregion
         foreach (var cs in BuildConnectionStrings(dbPath, password))
         {
+            // #region agent log
+            var maskedCs = cs.Contains("Password=", StringComparison.OrdinalIgnoreCase) ? "Filename=***;Password=***;" : cs;
+            DebugLog("PushSlimGameResultsToStream", "connection string attempt", new Dictionary<string, object?> { ["connectionStringMasked"] = maskedCs, ["csLength"] = cs.Length }, "H4");
+            // #endregion
             try
             {
+                // #region agent log
+                DebugLog("PushSlimGameResultsToStream", "before LiteDatabase ctor", new Dictionary<string, object?> { ["filenameInCs"] = dbPath }, "H5");
+                // #endregion
                 using var db = new LiteDatabase(cs);
                 var col = db.GetCollection(collectionName);
                 int written = 0;
@@ -113,6 +154,9 @@ internal static class Program
             }
             catch (Exception ex)
             {
+                // #region agent log
+                DebugLog("PushSlimGameResultsToStream", "LiteDB open failed", new Dictionary<string, object?> { ["message"] = ex.Message, ["connectionStringMasked"] = (cs.Contains("Password=", StringComparison.OrdinalIgnoreCase) ? "Filename=***;Password=***;" : cs) }, "H5");
+                // #endregion
                 Console.WriteLine($"LiteDB open failed: {ex.Message}");
             }
         }
