@@ -35,7 +35,7 @@ npm run dev:web
 
 - **직원 로그인**: http://localhost:5180/login  
 - **닉네임 등록**(로그인 후): http://localhost:5180/register  
-- **운영 보드**(localhost 전용): http://localhost:5180/board  
+- **운영 보드**(localhost 전용): http://localhost:5180/match  
 
 운영 보드 API(`/api/board`, `/api/board/entries/:id`)는 127.0.0.1에서만 접근 가능합니다.
 

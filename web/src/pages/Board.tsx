@@ -95,7 +95,7 @@ export default function Board() {
   } = useQuery({
     queryKey: ["board-matches"],
     queryFn: fetchBoardMatches,
-    refetchInterval: false,
+    refetchInterval: 5000,
   });
   const toggleMatchSelection = useCallback((id: string) => {
     setSelectedMatchIds((prev) => {

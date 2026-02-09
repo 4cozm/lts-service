@@ -24,7 +24,7 @@ export default function App() {
             </RequireStaff>
           }
         />
-        <Route path="/board" element={<Board />} />
+        <Route path="/match" element={<Board />} />
       </Routes>
     </AuthProvider>
   );

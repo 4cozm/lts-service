@@ -5,6 +5,26 @@ import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
 const MATCH_IDS_SET = "match:ids";
 const MATCHES_KEY_PREFIX = "match:";
 
+/** C# 슬림 요약은 PascalCase(Score, WinSide, Players). 프론트는 camelCase 기대하므로 alias 추가. */
+function normalizeMatchForFrontend(obj: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...obj };
+  const teams = out.Teams as Record<string, unknown> | undefined;
+  if (teams?.Red && typeof teams.Red === "object") {
+    const red = teams.Red as Record<string, unknown>;
+    if (red.Score !== undefined && red.score === undefined) (red as Record<string, unknown>).score = red.Score;
+    if (red.Players !== undefined && red.players === undefined) (red as Record<string, unknown>).players = red.Players;
+  }
+  if (teams?.Blue && typeof teams.Blue === "object") {
+    const blue = teams.Blue as Record<string, unknown>;
+    if (blue.Score !== undefined && blue.score === undefined) (blue as Record<string, unknown>).score = blue.Score;
+    if (blue.Players !== undefined && blue.players === undefined) (blue as Record<string, unknown>).players = blue.Players;
+  }
+  const result = out.Result as Record<string, unknown> | undefined;
+  if (result && result.WinSide !== undefined && result.winSide === undefined)
+    (result as Record<string, unknown>).winSide = result.WinSide;
+  return out;
+}
+
 const WAITING = "waiting";
 const PLAYING = "playing";
 const DONE = "done";
@@ -76,7 +96,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
         const d = String(kstDate.getUTCDate()).padStart(2, "0");
         const dateStr = `${y}-${mth}-${d}`;
         if (dateStr !== todayKst) continue;
-        matches.push(obj);
+        matches.push(normalizeMatchForFrontend(obj));
       } catch {
         continue;
       }
