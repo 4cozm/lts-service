@@ -199,37 +199,45 @@ export default function Board() {
             <div className="p-4 text-slate-500">당일 경기 기록이 없습니다.</div>
           ) : (
             <ul className="divide-y divide-white/5">
-              {matchesData.matches.map((match) => {
-                const id = String(match.Id ?? "");
-                const isSelected = selectedMatchIds.has(id);
-                return (
-                  <li
-                    key={id}
-                    className="flex items-center gap-2 p-2 hover:bg-white/5 cursor-pointer"
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
-                      setDetailMatch(match);
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleMatchSelection(id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded"
-                    />
-                    <span className="font-mono text-xs text-slate-500 w-20 truncate">{id}</span>
-                    <span className="flex-1 truncate">{String(match.Name ?? "-")}</span>
-                    <span className="text-slate-400 text-xs">{formatFinishTime(match.FinishTime as string)}</span>
-                    <span className="text-xs">
-                      {match.Teams?.Red?.score ?? "-"} : {match.Teams?.Blue?.score ?? "-"}
-                    </span>
-                    {match.Result?.winSide != null && (
-                      <span className="text-cyan-400 text-xs">{match.Result.winSide}</span>
-                    )}
-                  </li>
-                );
-              })}
+              {[...matchesData.matches]
+                .sort((a, b) => {
+                  const ta = a.FinishTime ? new Date(a.FinishTime as string).getTime() : 0;
+                  const tb = b.FinishTime ? new Date(b.FinishTime as string).getTime() : 0;
+                  return tb - ta;
+                })
+                .map((match) => {
+                  const id = String(match.Id ?? "");
+                  const isSelected = selectedMatchIds.has(id);
+                  const redScore = match.Teams?.Red?.score ?? (match.Teams?.Red as Record<string, unknown>)?.Score;
+                  const blueScore = match.Teams?.Blue?.score ?? (match.Teams?.Blue as Record<string, unknown>)?.Score;
+                  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center gap-2 p-2 hover:bg-white/5 cursor-pointer"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+                        setDetailMatch(match);
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleMatchSelection(id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded"
+                      />
+                      <span className="flex-1 truncate">{String(match.Name ?? "-")}</span>
+                      <span className="text-slate-400 text-xs shrink-0">{formatFinishTime(match.FinishTime as string)}</span>
+                      <span className="text-xs shrink-0">
+                        {redScore ?? "-"} : {blueScore ?? "-"}
+                      </span>
+                      <span className="text-cyan-400 text-xs font-medium shrink-0 w-14 text-right">
+                        {winSide != null ? `${winSide} 승` : "-"}
+                      </span>
+                    </li>
+                  );
+                })}
             </ul>
           )}
         </div>
