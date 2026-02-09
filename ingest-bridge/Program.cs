@@ -15,6 +15,7 @@ internal static class Program
     private const string DefaultStreamKey = "lts:match:ingest";
     private const string DefaultCollectionName = "game";
     private const int DefaultPollIntervalMs = 2000;
+    private const string RedisConnection = "127.0.0.1:6379";
 
     private static int Main(string[] args)
     {
@@ -23,7 +24,6 @@ internal static class Program
         // Load root .env (current dir or parent when run from ingest-bridge)
         Env.TraversePath().Load();
 
-        var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
         // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용
         var dbPath = Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH")
@@ -32,18 +32,13 @@ internal static class Program
         var password = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
         var collectionName = Environment.GetEnvironmentVariable("GAME_COLLECTION_NAME") ?? DefaultCollectionName;
 
-        if (string.IsNullOrWhiteSpace(redisUrl))
-        {
-            Console.WriteLine("REDIS_URL is required.");
-            return 2;
-        }
         if (string.IsNullOrWhiteSpace(dbPath))
         {
             Console.WriteLine("LITEDB_ARENA_PATH (or LITEDB_PATH) is required for arena/match data.");
             return 2;
         }
 
-        Console.WriteLine($"Redis: {MaskRedisUrl(redisUrl)}");
+        Console.WriteLine($"Redis: {RedisConnection}");
         Console.WriteLine($"Stream: {streamKey}");
         Console.WriteLine($"LiteDB (arena): {dbPath}");
         Console.WriteLine($"Poll interval: {pollMs}ms");
@@ -52,7 +47,7 @@ internal static class Program
 
         try
         {
-            using var redis = ConnectionMultiplexer.Connect(redisUrl);
+            using var redis = ConnectionMultiplexer.Connect(RedisConnection);
             var db = redis.GetDatabase();
             long lastSize = -1;
 
