@@ -39,12 +39,16 @@ type PlayerRecord = Record<string, unknown> & {
   maxConsecutiveKills?: number;
 };
 
-/** 년도 제외, 시:분만 (예: 15:31) */
+/** 12시간 형식, 초 제외 (예: 오후 7시 43분) */
 function formatTimeShort(s: string | undefined): string {
   if (!s) return "-";
   try {
     const d = new Date(s);
-    return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h < 12 ? "오전" : "오후";
+    const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${ampm} ${hour}시 ${m}분`;
   } catch {
     return String(s);
   }
@@ -76,7 +80,14 @@ export default function MatchDetailModal({ match, onClose }: Props) {
   const blue = match.Teams?.Blue;
   const redScore = red != null ? (red.score ?? (red as Record<string, unknown>).Score as number) : undefined;
   const blueScore = blue != null ? (blue.score ?? (blue as Record<string, unknown>).Score as number) : undefined;
-  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide as string | undefined;
+  const winSide =
+    redScore != null && blueScore != null
+      ? redScore > blueScore
+        ? "Red"
+        : blueScore > redScore
+          ? "Blue"
+          : null
+      : null;
   const durationSec = match.DurationSeconds;
   const durationMin = durationSec != null ? (durationSec / 60).toFixed(1) : null;
 
@@ -202,12 +213,6 @@ export default function MatchDetailModal({ match, onClose }: Props) {
           ) : null}
         </div>
 
-        {match.FirstBlood != null && Object.keys(match.FirstBlood).length > 0 && (
-          <div className="mt-4 text-xs">
-            <h3 className="text-slate-500 mb-1">First Blood</h3>
-            <pre className="font-mono text-slate-400 overflow-x-auto">{JSON.stringify(match.FirstBlood)}</pre>
-          </div>
-        )}
       </div>
     </div>
   );

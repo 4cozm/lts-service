@@ -72,10 +72,16 @@ async function fetchBoardMatches(): Promise<{ matches: MatchRecord[] }> {
   return res.json();
 }
 
+/** 12시간 형식, 초 제외 (예: 오후 7시 43분) */
 function formatFinishTime(s: string | undefined): string {
   if (!s) return "-";
   try {
-    return new Date(s).toLocaleTimeString("ko-KR", { hour12: false });
+    const d = new Date(s);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h < 12 ? "오전" : "오후";
+    const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${ampm} ${hour}시 ${m}분`;
   } catch {
     return String(s);
   }
@@ -208,9 +214,16 @@ export default function Board() {
                 .map((match) => {
                   const id = String(match.Id ?? "");
                   const isSelected = selectedMatchIds.has(id);
-                  const redScore = match.Teams?.Red?.score ?? (match.Teams?.Red as Record<string, unknown>)?.Score;
-                  const blueScore = match.Teams?.Blue?.score ?? (match.Teams?.Blue as Record<string, unknown>)?.Score;
-                  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
+                  const redScore = match.Teams?.Red?.score ?? (match.Teams?.Red as Record<string, unknown>)?.Score as number | undefined;
+                  const blueScore = match.Teams?.Blue?.score ?? (match.Teams?.Blue as Record<string, unknown>)?.Score as number | undefined;
+                  const winSide =
+                    redScore != null && blueScore != null
+                      ? redScore > blueScore
+                        ? "Red"
+                        : blueScore > redScore
+                          ? "Blue"
+                          : null
+                      : null;
                   return (
                     <li
                       key={id}
