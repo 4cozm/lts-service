@@ -18,6 +18,8 @@ namespace LtsIngestBridge
         private const string DefaultCollectionName = "game";
         private const int DefaultPollIntervalMs = 2000;
         private const string RedisConnection = "127.0.0.1:6379";
+        /// <summary>이미 스트림에 푸시한 경기 Id 집합. 멱등 전달을 위해 새 경기만 푸시.</summary>
+        private const string ArenaPushedSetKey = "checkpoint:arena:pushed";
 
         private static int Main(string[] args)
         {
@@ -107,7 +109,13 @@ namespace LtsIngestBridge
                         if (!TryBuildSlimSummary(storedJson!, out var summaryJson))
                             continue;
 
+                        string? matchId = TryGetIdFromSummaryJson(summaryJson);
+                        if (!string.IsNullOrWhiteSpace(matchId) && redisDb.SetContains(ArenaPushedSetKey, matchId))
+                            continue;
+
                         redisDb.StreamAdd(streamKey, "payload", summaryJson);
+                        if (!string.IsNullOrWhiteSpace(matchId))
+                            redisDb.SetAdd(ArenaPushedSetKey, matchId);
                         written++;
                     }
 
@@ -120,6 +128,18 @@ namespace LtsIngestBridge
             }
 
             return 0;
+        }
+
+        private static string? TryGetIdFromSummaryJson(string summaryJson)
+        {
+            try
+            {
+                using var j = STJ.JsonDocument.Parse(summaryJson);
+                if (j.RootElement.TryGetProperty("Id", out var idEl))
+                    return idEl.GetString();
+            }
+            catch { /* ignore */ }
+            return null;
         }
 
         private static bool TryGetSerializedStoredItem(BsonDocument doc, out string? storedJson)

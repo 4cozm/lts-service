@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <Reference Include="LiteDB">
-      <HintPath>C:\Users\Lasertagsports\Desktop\EDGE 6.1\EDGE 6.1\Windows_Prod\Windows_Prod\EDGE-6.1_Data\Managed\LiteDB.dll</HintPath>
+      <HintPath>$(LITEDB_DLL_PATH)</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
