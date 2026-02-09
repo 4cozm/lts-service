@@ -1,3 +1,17 @@
 node_modules
 firebase.json
 .env
+
+# Build / runtime
+dist
+*.tsbuildinfo
+
+# C# (ingest-bridge)
+ingest-bridge/bin
+ingest-bridge/obj
+
+# Frontend (web)
+web/dist
+
+# OS
+.DS_Store

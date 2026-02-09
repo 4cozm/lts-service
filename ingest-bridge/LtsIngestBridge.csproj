@@ -5,11 +5,23 @@
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>LtsIngestBridge</RootNamespace>
     <Nullable>enable</Nullable>
+    <!-- 게임/아레나와 동일한 LiteDB 버전 사용: 이 경로에 LiteDB.dll 있으면 NuGet 대신 이걸 씀. 빌드 시 -p:LiteDBDllPath=... 로 덮어쓸 수 있음. -->
+    <LiteDBDllPath Condition="'$(LiteDBDllPath)' == ''">$(MSBuildThisFileDirectory)lib\LiteDB.dll</LiteDBDllPath>
   </PropertyGroup>
+
+  <!-- 경로에 LiteDB.dll이 있으면 해당 DLL 참조 (ref/이전 코드처럼 같은 버전 사용) -->
+  <ItemGroup Condition="Exists('$(LiteDBDllPath)')">
+    <Reference Include="LiteDB">
+      <HintPath>$(LiteDBDllPath)</HintPath>
+    </Reference>
+  </ItemGroup>
+  <!-- DLL이 없으면 NuGet 패키지 사용 -->
+  <ItemGroup Condition="!Exists('$(LiteDBDllPath)')">
+    <PackageReference Include="LiteDB" Version="5.0.21" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
   </ItemGroup>
 

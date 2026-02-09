@@ -25,11 +25,12 @@ internal static class Program
         Env.TraversePath().Load();
 
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
-        // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용
-        var dbPath = Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH")
-            ?? Environment.GetEnvironmentVariable("LITEDB_PATH");
+        // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용. ref와 동일하게 파일 경로로만 접근.
+        var dbPath = NormalizePath(Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH")
+            ?? Environment.GetEnvironmentVariable("LITEDB_PATH"));
         var pollMs = int.TryParse(Environment.GetEnvironmentVariable("POLL_INTERVAL_MS"), out var ms) ? ms : DefaultPollIntervalMs;
-        var password = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
+        var passwordRaw = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
+        var password = string.IsNullOrWhiteSpace(passwordRaw) ? null : passwordRaw!.Trim();
         var collectionName = Environment.GetEnvironmentVariable("GAME_COLLECTION_NAME") ?? DefaultCollectionName;
 
         if (string.IsNullOrWhiteSpace(dbPath))
@@ -66,7 +67,7 @@ internal static class Program
                     var currentSize = fi.Length;
                     if (currentSize != lastSize)
                     {
-                        var written = PushSlimGameResultsToStream(db, dbPath, string.IsNullOrWhiteSpace(password) ? null : password, collectionName, streamKey);
+                        var written = PushSlimGameResultsToStream(db, dbPath, password, collectionName, streamKey);
                         if (written > 0)
                             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Pushed {written} match(es) to stream.");
                         lastSize = currentSize;
@@ -350,6 +351,7 @@ internal static class Program
         return null;
     }
 
+    /// <summary>ref와 동일: 패스워드 없으면 Filename= 경로 하나만 사용. 패스워드 있으면 Password= 시도 후 경로만 재시도.</summary>
     private static IEnumerable<string> BuildConnectionStrings(string dbPath, string? password)
     {
         if (!string.IsNullOrEmpty(password))
@@ -359,6 +361,16 @@ internal static class Program
             yield break;
         }
         yield return $"Filename={dbPath};";
+    }
+
+    /// <summary>.env에서 읽은 경로의 따옴표/공백 제거. ref처럼 순수 파일 경로로만 열기 위함.</summary>
+    private static string? NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        path = path!.Trim();
+        if (path.Length >= 2 && path[0] == '"' && path[path.Length - 1] == '"')
+            path = path.Substring(1, path.Length - 2).Trim();
+        return string.IsNullOrWhiteSpace(path) ? null : path;
     }
 
     private static string MaskRedisUrl(string url)
