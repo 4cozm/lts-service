@@ -81,9 +81,12 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
     const ids = await redis.smembers(MATCH_IDS_SET);
     const todayKst = getTodayDateString();
     const matches: Record<string, unknown>[] = [];
-    for (const id of ids) {
-      const raw = await redis.get(`${MATCHES_KEY_PREFIX}${id}`);
-      if (!raw) continue;
+    if (ids.length === 0) return reply.send({ matches });
+    const keys = ids.map((id) => `${MATCHES_KEY_PREFIX}${id}`);
+    const raws = await redis.mget(...keys);
+    for (let i = 0; i < ids.length; i++) {
+      const raw = raws[i];
+      if (!raw || typeof raw !== "string") continue;
       try {
         const obj = JSON.parse(raw) as Record<string, unknown> & { FinishTime?: string };
         const ft = obj.FinishTime;

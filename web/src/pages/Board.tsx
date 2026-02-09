@@ -132,9 +132,7 @@ export default function Board() {
 
   const activeEntry = data && activeId ? findEntry(data, activeId) : null;
 
-  if (isLoading) return <div className="p-8 text-slate-400">보드 로딩 중...</div>;
   if (error) return <div className="p-8 text-red-400">보드 조회 실패 (localhost에서만 접속 가능)</div>;
-  if (!data) return null;
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -148,14 +146,18 @@ export default function Board() {
         onDragEnd={handleDragEnd}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {COLUMNS.map((col) => (
-            <BoardColumn
-              key={col.id}
-              id={col.id}
-              title={col.title}
-              entries={data[col.id] ?? []}
-            />
-          ))}
+          {isLoading || !data ? (
+            <div className="col-span-full p-8 text-slate-400">보드 로딩 중...</div>
+          ) : (
+            COLUMNS.map((col) => (
+              <BoardColumn
+                key={col.id}
+                id={col.id}
+                title={col.title}
+                entries={data[col.id] ?? []}
+              />
+            ))
+          )}
         </div>
         <DragOverlay dropAnimation={null} style={{ zIndex: 1000 }}>
           {activeEntry ? (
