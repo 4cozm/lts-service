@@ -5,8 +5,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>LtsIngestBridge</RootNamespace>
     <Nullable>enable</Nullable>
-    <!-- 게임/아레나와 동일한 LiteDB 버전 사용: 이 경로에 LiteDB.dll 있으면 NuGet 대신 이걸 씀. 빌드 시 -p:LiteDBDllPath=... 로 덮어쓸 수 있음. -->
+    <!-- 1) -p:LiteDBDllPath= 빌드 인자, 2) lib\LiteDB.dll, 3) ref/경기 기록 파싱·LiteDB파싱과 동일한 EDGE 경로(해당 PC에 있으면) -->
     <LiteDBDllPath Condition="'$(LiteDBDllPath)' == ''">$(MSBuildThisFileDirectory)lib\LiteDB.dll</LiteDBDllPath>
+    <LiteDBDllPath Condition="'$(LiteDBDllPath)' == '' and Exists('C:\Users\Lasertagsports\Desktop\EDGE 6.1\EDGE 6.1\Windows_Prod\Windows_Prod\EDGE-6.1_Data\Managed\LiteDB.dll')">C:\Users\Lasertagsports\Desktop\EDGE 6.1\EDGE 6.1\Windows_Prod\Windows_Prod\EDGE-6.1_Data\Managed\LiteDB.dll</LiteDBDllPath>
   </PropertyGroup>
 
   <!-- 경로에 LiteDB.dll이 있으면 해당 DLL 참조 (ref/LiteDB파싱과 동일: HintPath + Private로 출력에 복사해 런타임에 같은 DLL 로드) -->
