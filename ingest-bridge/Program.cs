@@ -395,16 +395,17 @@ internal static class Program
         return null;
     }
 
-    /// <summary>ref와 동일: 패스워드 없으면 Filename= 경로 하나만 사용. 패스워드 있으면 Password= 시도 후 경로만 재시도.</summary>
+    /// <summary>ref와 동일: 패스워드 없으면 Filename= 경로 하나만 사용. ReadOnly=true 로 파일 잠금 방지(다른 프로세스가 동일 DB 사용 가능).</summary>
     private static IEnumerable<string> BuildConnectionStrings(string dbPath, string? password)
     {
+        const string readOnly = "ReadOnly=true";
         if (!string.IsNullOrEmpty(password))
         {
-            yield return $"Filename={dbPath};Password={password};";
-            yield return $"Filename={dbPath};";
+            yield return $"Filename={dbPath};Password={password};{readOnly}";
+            yield return $"Filename={dbPath};{readOnly}";
             yield break;
         }
-        yield return $"Filename={dbPath};";
+        yield return $"Filename={dbPath};{readOnly}";
     }
 
     /// <summary>.env에서 읽은 경로의 따옴표/공백 제거. ref처럼 순수 파일 경로로만 열기 위함.</summary>
