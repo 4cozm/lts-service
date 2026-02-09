@@ -169,7 +169,10 @@ export default function Board() {
 
       <section className="mt-8 glass rounded-xl p-4">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">경기 기록</h2>
+          <div>
+            <h2 className="text-lg font-semibold">경기 기록</h2>
+            <p className="text-slate-400 text-xs mt-0.5">한국시간(KST) 기준 당일 종료된 경기만 표시됩니다.</p>
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
