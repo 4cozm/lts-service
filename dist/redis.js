@@ -1,6 +1,7 @@
 import { Redis } from "ioredis";
 import { config } from "./config.js";
 const RECONNECT_INTERVAL_MS = 10_000;
+const MAX_RETRIES = 5;
 const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/f5f9e2b5-6e29-44c2-98b6-e53c33291b35";
 let client = null;
 export function getRedis() {
@@ -11,6 +12,11 @@ export function getRedis() {
         client = new Redis(config.REDIS_URL, {
             maxRetriesPerRequest: null,
             retryStrategy(times) {
+                if (times > MAX_RETRIES) {
+                    console.error("[Redis] connection failed after 5 retries (10s interval). Exiting.");
+                    process.exit(1);
+                    return null;
+                }
                 return RECONNECT_INTERVAL_MS;
             },
         });

@@ -3,10 +3,6 @@ declare const envSchema: z.ZodObject<{
     NODE_ENV: z.ZodDefault<z.ZodEnum<["development", "production", "test"]>>;
     PORT: z.ZodDefault<z.ZodNumber>;
     BIND_HOST: z.ZodDefault<z.ZodString>;
-    MATCH_RESULTS_PATH: z.ZodDefault<z.ZodString>;
-    PLAYERS_PATH: z.ZodDefault<z.ZodString>;
-    POLL_INTERVAL_MS: z.ZodDefault<z.ZodNumber>;
-    INGEST_SOURCE: z.ZodDefault<z.ZodEnum<["file", "stream"]>>;
     INGEST_STREAM_KEY: z.ZodDefault<z.ZodString>;
     STAFF_ID: z.ZodString;
     STAFF_PW: z.ZodString;
@@ -19,10 +15,6 @@ declare const envSchema: z.ZodObject<{
     NODE_ENV: "development" | "production" | "test";
     PORT: number;
     BIND_HOST: string;
-    MATCH_RESULTS_PATH: string;
-    PLAYERS_PATH: string;
-    POLL_INTERVAL_MS: number;
-    INGEST_SOURCE: "file" | "stream";
     INGEST_STREAM_KEY: string;
     STAFF_ID: string;
     STAFF_PW: string;
@@ -39,10 +31,6 @@ declare const envSchema: z.ZodObject<{
     NODE_ENV?: "development" | "production" | "test" | undefined;
     PORT?: number | undefined;
     BIND_HOST?: string | undefined;
-    MATCH_RESULTS_PATH?: string | undefined;
-    PLAYERS_PATH?: string | undefined;
-    POLL_INTERVAL_MS?: number | undefined;
-    INGEST_SOURCE?: "file" | "stream" | undefined;
     INGEST_STREAM_KEY?: string | undefined;
     JWT_EXPIRES_IN?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
@@ -53,10 +41,6 @@ export declare const config: {
     NODE_ENV: "development" | "production" | "test";
     PORT: number;
     BIND_HOST: string;
-    MATCH_RESULTS_PATH: string;
-    PLAYERS_PATH: string;
-    POLL_INTERVAL_MS: number;
-    INGEST_SOURCE: "file" | "stream";
     INGEST_STREAM_KEY: string;
     STAFF_ID: string;
     STAFF_PW: string;

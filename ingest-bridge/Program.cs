@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
+using DotNetEnv;
 using LiteDB;
 using StackExchange.Redis;
 using STJ = System.Text.Json;
@@ -18,6 +19,9 @@ internal static class Program
     private static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
+
+        // Load root .env (current dir or parent when run from ingest-bridge)
+        Env.TraversePath().Load();
 
         var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
