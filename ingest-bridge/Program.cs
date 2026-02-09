@@ -22,7 +22,8 @@ internal static class Program
     {
         try
         {
-            var logPath = Path.Combine(Environment.CurrentDirectory, ".cursor", "debug.log");
+            var logPath = Environment.GetEnvironmentVariable("DEBUG_LOG_PATH")
+                ?? Path.Combine(Environment.CurrentDirectory, ".cursor", "debug.log");
             var dir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             var line = STJ.JsonSerializer.Serialize(new Dictionary<string, object?>
@@ -45,6 +46,11 @@ internal static class Program
 
         // Load root .env (current dir or parent when run from ingest-bridge)
         Env.TraversePath().Load();
+
+        // #region agent log
+        var debugLogPath = Environment.GetEnvironmentVariable("DEBUG_LOG_PATH") ?? Path.Combine(Environment.CurrentDirectory, ".cursor", "debug.log");
+        DebugLog("Program.Main", "start", new Dictionary<string, object?> { ["CurrentDirectory"] = Environment.CurrentDirectory, ["DEBUG_LOG_PATH"] = Environment.GetEnvironmentVariable("DEBUG_LOG_PATH"), ["resolvedLogPath"] = debugLogPath }, "H1");
+        // #endregion
 
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
         // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용. ref와 동일하게 파일 경로로만 접근.
@@ -395,17 +401,16 @@ internal static class Program
         return null;
     }
 
-    /// <summary>ref와 동일: 패스워드 없으면 Filename= 경로 하나만 사용. ReadOnly=true 로 파일 잠금 방지(다른 프로세스가 동일 DB 사용 가능).</summary>
+    /// <summary>ref와 동일: 패스워드 없으면 Filename= 경로 하나만 사용. (일부 LiteDB 버전은 ReadOnly= 연결문 미지원 → 잠금은 열고 바로 닫기로 완화)</summary>
     private static IEnumerable<string> BuildConnectionStrings(string dbPath, string? password)
     {
-        const string readOnly = "ReadOnly=true";
         if (!string.IsNullOrEmpty(password))
         {
-            yield return $"Filename={dbPath};Password={password};{readOnly}";
-            yield return $"Filename={dbPath};{readOnly}";
+            yield return $"Filename={dbPath};Password={password};";
+            yield return $"Filename={dbPath};";
             yield break;
         }
-        yield return $"Filename={dbPath};{readOnly}";
+        yield return $"Filename={dbPath};";
     }
 
     /// <summary>.env에서 읽은 경로의 따옴표/공백 제거. ref처럼 순수 파일 경로로만 열기 위함.</summary>
