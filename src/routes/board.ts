@@ -96,6 +96,8 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
         const d = String(kstDate.getUTCDate()).padStart(2, "0");
         const dateStr = `${y}-${mth}-${d}`;
         if (dateStr !== todayKst) continue;
+        const durationSec = obj.DurationSeconds;
+        if (typeof durationSec === "number" && durationSec <= 360) continue;
         matches.push(normalizeMatchForFrontend(obj));
       } catch {
         continue;
