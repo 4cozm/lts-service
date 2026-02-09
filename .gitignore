@@ -1,6 +1,7 @@
 node_modules
 firebase.json
 .env
+ref/
 
 # Build / runtime
 dist

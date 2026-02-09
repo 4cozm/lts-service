@@ -9,10 +9,11 @@
     <LiteDBDllPath Condition="'$(LiteDBDllPath)' == ''">$(MSBuildThisFileDirectory)lib\LiteDB.dll</LiteDBDllPath>
   </PropertyGroup>
 
-  <!-- 경로에 LiteDB.dll이 있으면 해당 DLL 참조 (ref/이전 코드처럼 같은 버전 사용) -->
+  <!-- 경로에 LiteDB.dll이 있으면 해당 DLL 참조 (ref/LiteDB파싱과 동일: HintPath + Private로 출력에 복사해 런타임에 같은 DLL 로드) -->
   <ItemGroup Condition="Exists('$(LiteDBDllPath)')">
     <Reference Include="LiteDB">
       <HintPath>$(LiteDBDllPath)</HintPath>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
   <!-- DLL이 없으면 NuGet 패키지 사용 -->
