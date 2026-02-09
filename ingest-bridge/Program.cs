@@ -25,7 +25,9 @@ internal static class Program
 
         var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
         var streamKey = Environment.GetEnvironmentVariable("INGEST_STREAM_KEY") ?? DefaultStreamKey;
-        var dbPath = Environment.GetEnvironmentVariable("LITEDB_PATH");
+        // 경기 기록 DB (arena.data). 구버전 호환: LITEDB_ARENA_PATH 없으면 LITEDB_PATH 사용
+        var dbPath = Environment.GetEnvironmentVariable("LITEDB_ARENA_PATH")
+            ?? Environment.GetEnvironmentVariable("LITEDB_PATH");
         var pollMs = int.TryParse(Environment.GetEnvironmentVariable("POLL_INTERVAL_MS"), out var ms) ? ms : DefaultPollIntervalMs;
         var password = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
         var collectionName = Environment.GetEnvironmentVariable("GAME_COLLECTION_NAME") ?? DefaultCollectionName;
@@ -37,13 +39,13 @@ internal static class Program
         }
         if (string.IsNullOrWhiteSpace(dbPath))
         {
-            Console.WriteLine("LITEDB_PATH is required.");
+            Console.WriteLine("LITEDB_ARENA_PATH (or LITEDB_PATH) is required for arena/match data.");
             return 2;
         }
 
         Console.WriteLine($"Redis: {MaskRedisUrl(redisUrl)}");
         Console.WriteLine($"Stream: {streamKey}");
-        Console.WriteLine($"LiteDB: {dbPath}");
+        Console.WriteLine($"LiteDB (arena): {dbPath}");
         Console.WriteLine($"Poll interval: {pollMs}ms");
         Console.WriteLine("Press Ctrl+C to stop.");
         Console.WriteLine();
