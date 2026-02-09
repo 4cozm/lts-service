@@ -41,11 +41,11 @@ npm run dev:web
 
 ## Redis Stream + C# 브릿지 (선택)
 
-LiteDB에서 경기를 읽어 Redis Stream으로 보내려면:
+LiteDB(arena.data)에서 경기를 읽어 Redis Stream으로 보내려면:
 
 1. `.env`에 `INGEST_STREAM_KEY=lts:match:ingest`, `LITEDB_ARENA_PATH=...`(경기 기록 DB, 예: arena.data) 설정. 유저 승패용 DB는 `LITEDB_PLAYER_PATH`(예: player.data)로 구분.
-2. `npm run dev`(또는 `npm start`) 실행 시 Node가 C# 브릿지를 자동으로 같이 띄운다. Node는 스트림을 블로킹 구독하고, C#는 LiteDB 파일 크기 변화를 감지해 슬림 경기 요약을 스트림에 XADD한다. 둘 다 루트 `.env`를 사용한다.
-3. 브릿지만 따로 실행하려면: `dotnet run --project ingest-bridge` (프로젝트 루트에서).
+2. `npm run dev`(또는 `npm start`) 실행 시 Node가 C# 브릿지를 자동으로 같이 띄운다. Node는 스트림을 블로킹 구독하고, 브릿지는 LiteDB 파일 크기 변화를 감지해 슬림 경기 요약을 스트림에 넣는다. 둘 다 루트 `.env`를 사용한다.
+3. 브릿지만 따로 실행: `dotnet run --project ingest-bridge` (env의 LITEDB_ARENA_PATH 사용) 또는 `dotnet run --project ingest-bridge -- "<arena.data 전체 경로>"` (인자로 경로 지정).
 
 ## 스크립트
 

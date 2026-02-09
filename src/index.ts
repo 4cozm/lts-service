@@ -21,10 +21,7 @@ async function main() {
   const child = spawn("dotnet", ["run", "--project", bridgePath], {
     cwd: process.cwd(),
     stdio: "inherit",
-    env: {
-      ...process.env,
-      DEBUG_LOG_PATH: path.join(process.cwd(), ".cursor", "debug.log"),
-    },
+    env: process.env,
   });
   child.on("error", (err) => log.warn({ err: String(err), message: "ingest-bridge spawn error" }));
   child.on("exit", (code, signal) => {
