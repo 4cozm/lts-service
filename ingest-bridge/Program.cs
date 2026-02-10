@@ -357,7 +357,11 @@ namespace LtsIngestBridge
                 string? playerName = null;
 
                 if (pEl.TryGetProperty("Entity", out var entityEl) && entityEl.ValueKind == STJ.JsonValueKind.Object)
+                {
                     playerName = TryGetString(entityEl, "PlayerName");
+                    if (string.IsNullOrWhiteSpace(playerName) && entityEl.TryGetProperty("Settings", out var settingsEl) && settingsEl.ValueKind == STJ.JsonValueKind.Object)
+                        playerName = TryGetString(settingsEl, "PlayerName");
+                }
 
                 if (pEl.TryGetProperty("Context", out var ctxEl))
                 {
@@ -432,10 +436,14 @@ namespace LtsIngestBridge
                             medals ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                             foreach (var prop in medalsEl.EnumerateObject())
                             {
+                                int add;
                                 if (prop.Value.ValueKind == STJ.JsonValueKind.Number && prop.Value.TryGetInt32(out var mv))
-                                {
-                                    medals[prop.Name] = (medals.TryGetValue(prop.Name, out var cur) ? cur : 0) + mv;
-                                }
+                                    add = mv;
+                                else if (prop.Value.ValueKind == STJ.JsonValueKind.Object)
+                                    add = TryGetInt(prop.Value, "CountMedals") ?? 0;
+                                else
+                                    continue;
+                                medals[prop.Name] = (medals.TryGetValue(prop.Name, out var cur) ? cur : 0) + add;
                             }
                         }
                     }

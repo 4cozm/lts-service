@@ -10,6 +10,10 @@ dist
 # C# (ingest-bridge)
 ingest-bridge/bin
 ingest-bridge/obj
+ingest-bridge/.vs
+ingest-bridge/*.user
+ingest-bridge/*.suo
+ingest-bridge/packages
 
 # Frontend (web)
 web/dist
