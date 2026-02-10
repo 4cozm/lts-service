@@ -33,6 +33,19 @@ function getTeamScore(team: Record<string, unknown>): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
+/** 어두운 배경에서 가시성 좋은 팀 컬러 */
+const TEAM_COLOR: Record<string, string> = {
+  Red: "#f87171",
+  Blue: "#60a5fa",
+  Yellow: "#facc15",
+  Green: "#4ade80",
+  Purple: "#c084fc",
+};
+const DEFAULT_TEAM_COLOR = "#94a3b8";
+function getTeamColor(teamKey: string): string {
+  return TEAM_COLOR[teamKey] ?? DEFAULT_TEAM_COLOR;
+}
+
 function getMatchWinSide(match: MatchRecord): string | null {
   // 새 포맷: 최상위 WinSide / winSide
   const ws = match.winSide ?? match.WinSide;
@@ -262,10 +275,6 @@ export default function Board() {
                     const id = String(match.Id ?? "");
                     const isSelected = selectedMatchIds.has(id);
                     const teamEntries = getTeamEntries(match);
-                    const scoreStr = teamEntries.map(([key, t]) => {
-                      const s = getTeamScore(t);
-                      return s != null ? `${key[0]}${s}` : `${key[0]}-`;
-                    }).join(" : ");
                     const winSide = getMatchWinSide(match);
                     return (
                       <li
@@ -285,9 +294,21 @@ export default function Board() {
                           className="rounded shrink-0"
                         />
                         <span className="truncate text-sm">{String(match.Name ?? "-")}</span>
-                        <span className="text-xs text-center truncate" title={scoreStr}>{scoreStr || "-"}</span>
-                        <span className="text-xs text-center font-medium text-cyan-400 truncate">
-                          {winSide != null ? `${winSide} 승` : "-"}
+                        <span className="text-xs text-center flex items-center justify-center gap-0.5">
+                          {teamEntries.length > 0 ? teamEntries.map(([key, t], i) => {
+                            const s = getTeamScore(t);
+                            return (
+                              <span key={key} className="inline-flex items-center gap-0.5">
+                                {i > 0 && <span className="text-slate-500 mx-0.5">:</span>}
+                                <span className="font-semibold" style={{ color: getTeamColor(key) }}>{s ?? "-"}</span>
+                              </span>
+                            );
+                          }) : "-"}
+                        </span>
+                        <span className="text-xs text-center font-medium truncate">
+                          {winSide != null
+                            ? <span style={{ color: getTeamColor(winSide) }}>{winSide} 승</span>
+                            : "-"}
                         </span>
                         <span className="text-xs text-right text-slate-400">{formatFinishTime(match.FinishTime as string)}</span>
                       </li>
