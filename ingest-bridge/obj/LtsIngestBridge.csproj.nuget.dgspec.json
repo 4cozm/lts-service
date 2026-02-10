@@ -10,7 +10,7 @@
         "projectUniqueName": "/Users/hong-geol/Documents/GitHub/lts-service/ingest-bridge/LtsIngestBridge.csproj",
         "projectName": "LtsIngestBridge",
         "projectPath": "/Users/hong-geol/Documents/GitHub/lts-service/ingest-bridge/LtsIngestBridge.csproj",
-        "packagesPath": "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/44c6c4c9884deb7417ba624eb466ab48/nuget",
+        "packagesPath": "/var/folders/5k/wrh0x_6j28g0lrvcm4kclhx40000gn/T/cursor-sandbox-cache/8fad53ac5f42e31686bc1264bfddf4e5/nuget",
         "outputPath": "/Users/hong-geol/Documents/GitHub/lts-service/ingest-bridge/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -44,9 +44,9 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
-            "LiteDB": {
+            "DotNetEnv": {
               "target": "Package",
-              "version": "[5.0.21, )"
+              "version": "[3.1.1, )"
             },
             "StackExchange.Redis": {
               "target": "Package",

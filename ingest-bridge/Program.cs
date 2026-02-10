@@ -100,7 +100,7 @@ namespace LtsIngestBridge
                 {
                     using var db = new LiteDatabase(cs);
                     var col = db.GetCollection(collectionName);
-                    int written = 0;
+                    var collected = new List<(string? matchId, string summaryJson, string? launchTime)>();
 
                     foreach (var doc in col.FindAll())
                     {
@@ -110,6 +110,30 @@ namespace LtsIngestBridge
                             continue;
 
                         string? matchId = TryGetIdFromSummaryJson(summaryJson);
+                        string? launchTime = TryGetLaunchTimeFromSummaryJson(summaryJson);
+                        collected.Add((matchId, summaryJson, launchTime));
+                    }
+
+                    collected.Sort((a, b) =>
+                    {
+                        var ta = ParseLaunchTimeToTicks(a.launchTime);
+                        var tb = ParseLaunchTimeToTicks(b.launchTime);
+                        return tb.CompareTo(ta);
+                    });
+
+                    var seenIds = new HashSet<string?>(StringComparer.OrdinalIgnoreCase);
+                    var deduped = new List<(string? matchId, string summaryJson)>();
+                    foreach (var (matchId, summaryJson, _) in collected)
+                    {
+                        if (string.IsNullOrWhiteSpace(matchId)) { deduped.Add((matchId, summaryJson)); continue; }
+                        if (seenIds.Contains(matchId)) continue;
+                        seenIds.Add(matchId);
+                        deduped.Add((matchId, summaryJson));
+                    }
+
+                    int written = 0;
+                    foreach (var (matchId, summaryJson) in deduped)
+                    {
                         if (!string.IsNullOrWhiteSpace(matchId) && redisDb.SetContains(ArenaPushedSetKey, matchId))
                             continue;
 
@@ -128,6 +152,24 @@ namespace LtsIngestBridge
             }
 
             return 0;
+        }
+
+        private static string? TryGetLaunchTimeFromSummaryJson(string summaryJson)
+        {
+            try
+            {
+                using var j = STJ.JsonDocument.Parse(summaryJson);
+                if (j.RootElement.TryGetProperty("LaunchTime", out var el))
+                    return el.GetString();
+            }
+            catch { /* ignore */ }
+            return null;
+        }
+
+        private static long ParseLaunchTimeToTicks(string? launchTime)
+        {
+            if (string.IsNullOrWhiteSpace(launchTime)) return DateTimeOffset.MinValue.Ticks;
+            return DateTimeOffset.TryParse(launchTime, out var dt) ? dt.Ticks : DateTimeOffset.MinValue.Ticks;
         }
 
         private static string? TryGetIdFromSummaryJson(string summaryJson)
@@ -190,32 +232,19 @@ namespace LtsIngestBridge
                 using var jd = STJ.JsonDocument.Parse(storedJson);
                 var root = jd.RootElement;
 
-                if (!root.TryGetProperty("Teams", out var teamsEl)) return false;
-                if (!root.TryGetProperty("Statistics", out var matchStatsEl)) return false;
-                if (!matchStatsEl.TryGetProperty("Result", out var resultEl)) return false;
+                if (!root.TryGetProperty("Id", out _)) return false;
+                if (!root.TryGetProperty("LaunchTime", out _)) return false;
+                if (!root.TryGetProperty("Teams", out var teamsEl) || teamsEl.ValueKind != STJ.JsonValueKind.Object)
+                    return false;
 
-                if (!teamsEl.TryGetProperty("Red", out var redTeamEl)) return false;
-                if (!teamsEl.TryGetProperty("Blue", out var blueTeamEl)) return false;
-
-                string? redTeamId = TryGetString(redTeamEl, "Id");
-                string? blueTeamId = TryGetString(blueTeamEl, "Id");
-                int? redScore = TryGetInt(redTeamEl, "Score");
-                int? blueScore = TryGetInt(blueTeamEl, "Score");
-
-                string? winTeamId = null;
-                if (resultEl.TryGetProperty("WinTeamIds", out var winIdsEl) &&
-                    winIdsEl.ValueKind == STJ.JsonValueKind.Array &&
-                    winIdsEl.GetArrayLength() > 0)
+                int totalPlayers = 0;
+                foreach (var teamProp in teamsEl.EnumerateObject())
                 {
-                    winTeamId = winIdsEl[0].GetString();
+                    var teamEl = teamProp.Value;
+                    if (teamEl.TryGetProperty("Players", out var playersEl) && playersEl.ValueKind == STJ.JsonValueKind.Array)
+                        totalPlayers += playersEl.GetArrayLength();
                 }
-
-                int? resultType = TryGetInt(resultEl, "ResultType");
-
-                string winSide =
-                    (winTeamId != null && redTeamId != null && winTeamId.Equals(redTeamId, StringComparison.OrdinalIgnoreCase)) ? "Red" :
-                    (winTeamId != null && blueTeamId != null && winTeamId.Equals(blueTeamId, StringComparison.OrdinalIgnoreCase)) ? "Blue" :
-                    "Unknown";
+                if (totalPlayers < 1) return false;
 
                 string? matchId = TryGetString(root, "Id");
                 string? matchName = TryGetString(root, "Name");
@@ -227,49 +256,83 @@ namespace LtsIngestBridge
                     durationSeconds = (ft - lt).TotalSeconds;
 
                 var idToName = new Dictionary<int, string>();
-                var redPlayers = ExtractSlimPlayers(redTeamEl, "Red", idToName);
-                var bluePlayers = ExtractSlimPlayers(blueTeamEl, "Blue", idToName);
+                var teamsDict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                var teamIdByKey = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-                object? firstBloodObj = null;
-                if (matchStatsEl.TryGetProperty("FirstBlood", out var fbEl) && fbEl.ValueKind == STJ.JsonValueKind.Object)
+                foreach (var teamProp in teamsEl.EnumerateObject())
                 {
-                    int? killerId = TryGetInt(fbEl, "ExterminatorPlayerId");
-                    int? victimId = TryGetInt(fbEl, "VictimPlayerId");
-
-                    string? killerName = (killerId.HasValue && idToName.TryGetValue(killerId.Value, out var kn)) ? kn : null;
-                    string? victimName = (victimId.HasValue && idToName.TryGetValue(victimId.Value, out var vn)) ? vn : null;
-
-                    firstBloodObj = new
-                    {
-                        KillerPlayerId = killerId,
-                        KillerName = killerName,
-                        VictimPlayerId = victimId,
-                        VictimName = victimName
-                    };
+                    var teamKey = teamProp.Name;
+                    var teamEl = teamProp.Value;
+                    string? teamId = TryGetString(teamEl, "Id");
+                    int? score = TryGetInt(teamEl, "Score");
+                    var players = ExtractSlimPlayers(teamEl, teamKey, idToName);
+                    teamsDict[teamKey] = new { Id = teamId, Score = score, Players = players };
+                    teamIdByKey[teamKey] = teamId;
                 }
 
-                var summary = new
+                string? winTeamId = null;
+                int? resultType = null;
+                string? winSide = null;
+                object? firstBloodObj = null;
+
+                if (root.TryGetProperty("Statistics", out var matchStatsEl))
                 {
-                    Id = matchId,
-                    Name = matchName,
-                    LaunchTime = launchTime,
-                    FinishTime = finishTime,
-                    DurationSeconds = durationSeconds,
-
-                    Teams = new
+                    if (matchStatsEl.TryGetProperty("Result", out var resultEl))
                     {
-                        Red = new { Id = redTeamId, Score = redScore, Players = redPlayers },
-                        Blue = new { Id = blueTeamId, Score = blueScore, Players = bluePlayers }
-                    },
+                        if (resultEl.TryGetProperty("WinTeamIds", out var winIdsEl) &&
+                            winIdsEl.ValueKind == STJ.JsonValueKind.Array &&
+                            winIdsEl.GetArrayLength() > 0)
+                        {
+                            winTeamId = winIdsEl[0].GetString();
+                            foreach (var kv in teamIdByKey)
+                            {
+                                if (winTeamId != null && kv.Value != null &&
+                                    winTeamId.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    winSide = kv.Key;
+                                    break;
+                                }
+                            }
+                            if (winSide == null) winSide = "Unknown";
+                        }
+                        resultType = TryGetInt(resultEl, "ResultType");
+                    }
 
-                    Result = new
+                    if (matchStatsEl.TryGetProperty("FirstBlood", out var fbEl) && fbEl.ValueKind == STJ.JsonValueKind.Object)
                     {
-                        WinTeamId = winTeamId,
-                        WinSide = winSide,
-                        ResultType = resultType
-                    },
+                        int? killerId = TryGetInt(fbEl, "ExterminatorPlayerId");
+                        int? victimId = TryGetInt(fbEl, "VictimPlayerId");
 
-                    FirstBlood = firstBloodObj
+                        string? killerName = (killerId.HasValue && idToName.TryGetValue(killerId.Value, out var kn)) ? kn : null;
+                        string? victimName = (victimId.HasValue && idToName.TryGetValue(victimId.Value, out var vn)) ? vn : null;
+
+                        firstBloodObj = new
+                        {
+                            KillerPlayerId = killerId,
+                            KillerName = killerName,
+                            VictimPlayerId = victimId,
+                            VictimName = victimName
+                        };
+                    }
+                }
+
+                var resultObj = new Dictionary<string, object?>
+                {
+                    ["WinTeamId"] = winTeamId,
+                    ["WinSide"] = winSide ?? "Unknown",
+                    ["ResultType"] = resultType
+                };
+
+                var summary = new Dictionary<string, object?>
+                {
+                    ["Id"] = matchId,
+                    ["Name"] = matchName,
+                    ["LaunchTime"] = launchTime,
+                    ["FinishTime"] = finishTime,
+                    ["DurationSeconds"] = durationSeconds,
+                    ["Teams"] = teamsDict,
+                    ["Result"] = resultObj,
+                    ["FirstBlood"] = firstBloodObj
                 };
 
                 summaryJson = STJ.JsonSerializer.Serialize(summary);
@@ -293,23 +356,28 @@ namespace LtsIngestBridge
                 int? playerId = null;
                 string? playerName = null;
 
-                if (pEl.TryGetProperty("Context", out var ctxEl) &&
-                    ctxEl.TryGetProperty("Info", out var infoEl) &&
-                    infoEl.ValueKind == STJ.JsonValueKind.Object)
-                {
-                    playerId = TryGetInt(infoEl, "Id");
-                    playerName = TryGetString(infoEl, "Name");
-                }
-
-                if (string.IsNullOrWhiteSpace(playerName) &&
-                    pEl.TryGetProperty("Entity", out var entityEl) &&
-                    entityEl.ValueKind == STJ.JsonValueKind.Object)
-                {
+                if (pEl.TryGetProperty("Entity", out var entityEl) && entityEl.ValueKind == STJ.JsonValueKind.Object)
                     playerName = TryGetString(entityEl, "PlayerName");
-                }
 
-                if (playerId.HasValue && !string.IsNullOrWhiteSpace(playerName))
-                    idToName[playerId.Value] = playerName!;
+                if (pEl.TryGetProperty("Context", out var ctxEl))
+                {
+                    if (string.IsNullOrWhiteSpace(playerName) &&
+                        ctxEl.TryGetProperty("Info", out var infoEl) && infoEl.ValueKind == STJ.JsonValueKind.Object)
+                        playerName = TryGetString(infoEl, "Name");
+
+                    int? infoId = null;
+                    if (ctxEl.TryGetProperty("Info", out var infoEl2) && infoEl2.ValueKind == STJ.JsonValueKind.Object)
+                        infoId = TryGetInt(infoEl2, "Id");
+                    int? deviceId = TryGetInt(ctxEl, "DeviceId");
+                    int? preconfiguredDeviceId = TryGetInt(ctxEl, "PreconfiguredDeviceId");
+                    playerId = deviceId ?? preconfiguredDeviceId ?? infoId;
+                    if (playerId.HasValue && !string.IsNullOrWhiteSpace(playerName))
+                    {
+                        idToName[playerId.Value] = playerName;
+                        if (infoId.HasValue && infoId.Value != playerId.Value)
+                            idToName[infoId.Value] = playerName;
+                    }
+                }
 
                 int kills = 0;
                 int deaths = 0;

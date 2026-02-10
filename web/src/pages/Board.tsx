@@ -17,9 +17,36 @@ type MatchRecord = Record<string, unknown> & {
   Id?: string | number;
   Name?: string;
   FinishTime?: string;
-  Teams?: { Red?: { score?: number }; Blue?: { score?: number } };
+  Teams?: Record<string, { score?: number; Score?: number }>;
   Result?: { winSide?: string };
 };
+
+function getTeamEntries(match: MatchRecord): [string, Record<string, unknown>][] {
+  const teams = match.Teams;
+  if (!teams || typeof teams !== "object") return [];
+  return Object.entries(teams).filter(([, t]) => t && typeof t === "object") as [string, Record<string, unknown>][];
+}
+
+function getTeamScore(team: Record<string, unknown>): number | undefined {
+  const v = team.score ?? team.Score;
+  return typeof v === "number" ? v : undefined;
+}
+
+function getMatchWinSide(match: MatchRecord): string | null {
+  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
+  if (typeof winSide === "string" && winSide) return winSide;
+  const entries = getTeamEntries(match);
+  let maxScore = -1;
+  let winner: string | null = null;
+  for (const [key, team] of entries) {
+    const s = getTeamScore(team);
+    if (s != null && s > maxScore) {
+      maxScore = s;
+      winner = key;
+    }
+  }
+  return winner;
+}
 
 type Status = "waiting" | "playing" | "done";
 
@@ -214,16 +241,9 @@ export default function Board() {
                 .map((match) => {
                   const id = String(match.Id ?? "");
                   const isSelected = selectedMatchIds.has(id);
-                  const redScore = match.Teams?.Red?.score ?? (match.Teams?.Red as Record<string, unknown>)?.Score as number | undefined;
-                  const blueScore = match.Teams?.Blue?.score ?? (match.Teams?.Blue as Record<string, unknown>)?.Score as number | undefined;
-                  const winSide =
-                    redScore != null && blueScore != null
-                      ? redScore > blueScore
-                        ? "Red"
-                        : blueScore > redScore
-                          ? "Blue"
-                          : null
-                      : null;
+                  const teamEntries = getTeamEntries(match);
+                  const scoreStr = teamEntries.map(([, t]) => getTeamScore(t) ?? "-").join(" : ");
+                  const winSide = getMatchWinSide(match);
                   return (
                     <li
                       key={id}
@@ -242,9 +262,7 @@ export default function Board() {
                       />
                       <span className="flex-1 truncate">{String(match.Name ?? "-")}</span>
                       <span className="text-slate-400 text-xs shrink-0">{formatFinishTime(match.FinishTime as string)}</span>
-                      <span className="text-xs shrink-0">
-                        {redScore ?? "-"} : {blueScore ?? "-"}
-                      </span>
+                      <span className="text-xs shrink-0 min-w-0 truncate" title={scoreStr}>{scoreStr || "-"}</span>
                       <span className="text-cyan-400 text-xs font-medium shrink-0 w-14 text-right">
                         {winSide != null ? `${winSide} 승` : "-"}
                       </span>

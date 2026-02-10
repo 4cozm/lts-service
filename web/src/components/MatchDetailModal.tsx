@@ -4,13 +4,22 @@ type MatchRecord = Record<string, unknown> & {
   LaunchTime?: string;
   FinishTime?: string;
   DurationSeconds?: number;
-  Teams?: {
-    Red?: { teamId?: unknown; score?: number; Score?: number; players?: unknown[]; Players?: unknown[] };
-    Blue?: { teamId?: unknown; score?: number; Score?: number; players?: unknown[]; Players?: unknown[] };
-  };
+  Teams?: Record<string, { score?: number; Score?: number; players?: unknown[]; Players?: unknown[] }>;
   Result?: { winTeamId?: unknown; winSide?: string; WinSide?: string; resultType?: string };
   FirstBlood?: { killer?: unknown; victim?: unknown };
 };
+
+const TEAM_STYLES: Record<string, { border: string; bg: string; title: string }> = {
+  Red: { border: "border-red-500/20", bg: "bg-red-500/5", title: "text-red-400/90" },
+  Blue: { border: "border-blue-500/20", bg: "bg-blue-500/5", title: "text-blue-400/90" },
+  Yellow: { border: "border-yellow-500/20", bg: "bg-yellow-500/5", title: "text-yellow-400/90" },
+  Green: { border: "border-green-500/20", bg: "bg-green-500/5", title: "text-green-400/90" },
+  Purple: { border: "border-purple-500/20", bg: "bg-purple-500/5", title: "text-purple-400/90" },
+};
+const DEFAULT_TEAM_STYLE = { border: "border-white/20", bg: "bg-white/5", title: "text-slate-300" };
+function getTeamStyle(teamKey: string) {
+  return TEAM_STYLES[teamKey] ?? DEFAULT_TEAM_STYLE;
+}
 
 type PlayerRecord = Record<string, unknown> & {
   PlayerId?: number;
@@ -72,27 +81,41 @@ type Props = {
   onClose: () => void;
 };
 
+function getTeamEntries(match: MatchRecord): [string, Record<string, unknown>][] {
+  const teams = match.Teams;
+  if (!teams || typeof teams !== "object") return [];
+  return Object.entries(teams).filter(([, t]) => t && typeof t === "object") as [string, Record<string, unknown>][];
+}
+
+function getTeamScore(team: Record<string, unknown>): number | undefined {
+  const v = team.score ?? team.Score;
+  return typeof v === "number" ? v : undefined;
+}
+
+function getMatchWinSide(match: MatchRecord): string | null {
+  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
+  if (typeof winSide === "string" && winSide) return winSide;
+  const entries = getTeamEntries(match);
+  let maxScore = -1;
+  let winner: string | null = null;
+  for (const [key, team] of entries) {
+    const s = getTeamScore(team);
+    if (s != null && s > maxScore) {
+      maxScore = s;
+      winner = key;
+    }
+  }
+  return winner;
+}
+
 export default function MatchDetailModal({ match, onClose }: Props) {
   if (!match) return null;
 
   const name = (match.Name as string) ?? "-";
-  const red = match.Teams?.Red;
-  const blue = match.Teams?.Blue;
-  const redScore = red != null ? (red.score ?? (red as Record<string, unknown>).Score as number) : undefined;
-  const blueScore = blue != null ? (blue.score ?? (blue as Record<string, unknown>).Score as number) : undefined;
-  const winSide =
-    redScore != null && blueScore != null
-      ? redScore > blueScore
-        ? "Red"
-        : blueScore > redScore
-          ? "Blue"
-          : null
-      : null;
+  const teamEntries = getTeamEntries(match);
+  const winSide = getMatchWinSide(match);
   const durationSec = match.DurationSeconds;
   const durationMin = durationSec != null ? (durationSec / 60).toFixed(1) : null;
-
-  const redPlayers = (red?.players ?? (red as Record<string, unknown>)?.Players) as PlayerRecord[] | undefined;
-  const bluePlayers = (blue?.players ?? (blue as Record<string, unknown>)?.Players) as PlayerRecord[] | undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -136,14 +159,17 @@ export default function MatchDetailModal({ match, onClose }: Props) {
           </div>
         </dl>
 
-        {/* 팀 스코어: 몇 대 몇, 누가 이겼는지 */}
-        {(red != null || blue != null) && (
+        {/* 팀 스코어: 몇 대 몇, 누가 이겼는지 (동적 팀) */}
+        {teamEntries.length > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
             <h3 className="text-slate-400 text-xs font-medium mb-2">팀 스코어</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-red-400/90">Red {redScore ?? "-"}</span>
-              <span className="text-slate-500">:</span>
-              <span className="font-medium text-blue-400/90">Blue {blueScore ?? "-"}</span>
+              {teamEntries.map(([teamKey, team], i) => (
+                <span key={teamKey}>
+                  {i > 0 && <span className="text-slate-500 mx-0.5">:</span>}
+                  <span className="font-medium">{teamKey} {getTeamScore(team) ?? "-"}</span>
+                </span>
+              ))}
               {winSide != null && (
                 <span className="text-cyan-400 font-medium ml-1">· {winSide} 승</span>
               )}
@@ -151,66 +177,42 @@ export default function MatchDetailModal({ match, onClose }: Props) {
           </div>
         )}
 
-        {/* 선수 세부: Red / Blue 각각 테이블 */}
+        {/* 선수 세부: 팀별 테이블 (동적 팀) */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {redPlayers?.length ? (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-              <h3 className="text-red-400/90 text-xs font-semibold mb-2">Red ({redPlayers.length}명)</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-slate-500 border-b border-white/10">
-                      <th className="text-left py-1 pr-2">닉네임</th>
-                      <th className="text-right py-1">K/D</th>
-                      <th className="text-right py-1">점수</th>
-                      <th className="text-right py-1">명중</th>
-                      <th className="text-right py-1">피해</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {redPlayers.map((p, i) => (
-                      <tr key={i} className="border-b border-white/5">
-                        <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
-                        <td className="text-right py-1">{num(p.Kills ?? p.kills)}/{num(p.Deaths ?? p.deaths)}</td>
-                        <td className="text-right py-1">{num(p.Score ?? p.score)}</td>
-                        <td className="text-right py-1">{pct(p.Accuracy ?? p.accuracy)}</td>
-                        <td className="text-right py-1">{num(p.DamageDealt ?? p.damageDealt)}</td>
+          {teamEntries.map(([teamKey, team]) => {
+            const players = (team.players ?? team.Players) as PlayerRecord[] | undefined;
+            const style = getTeamStyle(teamKey);
+            if (!players?.length) return null;
+            return (
+              <div key={teamKey} className={`rounded-lg border ${style.border} ${style.bg} p-3`}>
+                <h3 className={`${style.title} text-xs font-semibold mb-2`}>{teamKey} ({players.length}명)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-slate-500 border-b border-white/10">
+                        <th className="text-left py-1 pr-2">닉네임</th>
+                        <th className="text-right py-1">K/D</th>
+                        <th className="text-right py-1">점수</th>
+                        <th className="text-right py-1">명중</th>
+                        <th className="text-right py-1">피해</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {players.map((p, i) => (
+                        <tr key={i} className="border-b border-white/5">
+                          <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
+                          <td className="text-right py-1">{num(p.Kills ?? p.kills)}/{num(p.Deaths ?? p.deaths)}</td>
+                          <td className="text-right py-1">{num(p.Score ?? p.score)}</td>
+                          <td className="text-right py-1">{pct(p.Accuracy ?? p.accuracy)}</td>
+                          <td className="text-right py-1">{num(p.DamageDealt ?? p.damageDealt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {bluePlayers?.length ? (
-            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-              <h3 className="text-blue-400/90 text-xs font-semibold mb-2">Blue ({bluePlayers.length}명)</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-slate-500 border-b border-white/10">
-                      <th className="text-left py-1 pr-2">닉네임</th>
-                      <th className="text-right py-1">K/D</th>
-                      <th className="text-right py-1">점수</th>
-                      <th className="text-right py-1">명중</th>
-                      <th className="text-right py-1">피해</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bluePlayers.map((p, i) => (
-                      <tr key={i} className="border-b border-white/5">
-                        <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
-                        <td className="text-right py-1">{num(p.Kills ?? p.kills)}/{num(p.Deaths ?? p.deaths)}</td>
-                        <td className="text-right py-1">{num(p.Score ?? p.score)}</td>
-                        <td className="text-right py-1">{pct(p.Accuracy ?? p.accuracy)}</td>
-                        <td className="text-right py-1">{num(p.DamageDealt ?? p.damageDealt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
+            );
+          })}
         </div>
 
       </div>

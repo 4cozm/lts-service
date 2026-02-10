@@ -5,19 +5,18 @@ import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
 const MATCH_IDS_SET = "match:ids";
 const MATCHES_KEY_PREFIX = "match:";
 
-/** C# 슬림 요약은 PascalCase(Score, WinSide, Players). 프론트는 camelCase 기대하므로 alias 추가. */
+/** C# 슬림 요약은 PascalCase(Score, WinSide, Players). 프론트는 camelCase 기대하므로 모든 팀에 alias 추가. */
 function normalizeMatchForFrontend(obj: Record<string, unknown>): Record<string, unknown> {
   const out = { ...obj };
   const teams = out.Teams as Record<string, unknown> | undefined;
-  if (teams?.Red && typeof teams.Red === "object") {
-    const red = teams.Red as Record<string, unknown>;
-    if (red.Score !== undefined && red.score === undefined) (red as Record<string, unknown>).score = red.Score;
-    if (red.Players !== undefined && red.players === undefined) (red as Record<string, unknown>).players = red.Players;
-  }
-  if (teams?.Blue && typeof teams.Blue === "object") {
-    const blue = teams.Blue as Record<string, unknown>;
-    if (blue.Score !== undefined && blue.score === undefined) (blue as Record<string, unknown>).score = blue.Score;
-    if (blue.Players !== undefined && blue.players === undefined) (blue as Record<string, unknown>).players = blue.Players;
+  if (teams && typeof teams === "object") {
+    for (const key of Object.keys(teams)) {
+      const team = teams[key] as Record<string, unknown> | undefined;
+      if (team && typeof team === "object") {
+        if (team.Score !== undefined && team.score === undefined) (team as Record<string, unknown>).score = team.Score;
+        if (team.Players !== undefined && team.players === undefined) (team as Record<string, unknown>).players = team.Players;
+      }
+    }
   }
   const result = out.Result as Record<string, unknown> | undefined;
   if (result && result.WinSide !== undefined && result.winSide === undefined)
