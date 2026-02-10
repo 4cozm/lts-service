@@ -18,7 +18,8 @@ type MatchRecord = Record<string, unknown> & {
   Name?: string;
   FinishTime?: string;
   Teams?: Record<string, { score?: number; Score?: number }>;
-  Result?: { winSide?: string };
+  WinSide?: string;
+  winSide?: string;
 };
 
 function getTeamEntries(match: MatchRecord): [string, Record<string, unknown>][] {
@@ -33,8 +34,14 @@ function getTeamScore(team: Record<string, unknown>): number | undefined {
 }
 
 function getMatchWinSide(match: MatchRecord): string | null {
-  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
-  if (typeof winSide === "string" && winSide) return winSide;
+  // 새 포맷: 최상위 WinSide / winSide
+  const ws = match.winSide ?? match.WinSide;
+  if (typeof ws === "string" && ws) return ws;
+  // 하위 호환: Result.winSide
+  const result = match.Result as Record<string, unknown> | undefined;
+  const rws = result?.winSide ?? result?.WinSide;
+  if (typeof rws === "string" && rws) return rws as string;
+  // fallback: 가장 높은 팀 스코어
   const entries = getTeamEntries(match);
   let maxScore = -1;
   let winner: string | null = null;

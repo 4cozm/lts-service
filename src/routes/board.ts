@@ -5,9 +5,10 @@ import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
 const MATCH_IDS_SET = "match:ids";
 const MATCHES_KEY_PREFIX = "match:";
 
-/** C# 슬림 요약은 PascalCase(Score, WinSide, Players). 프론트는 camelCase 기대하므로 모든 팀에 alias 추가. */
+/** C# 슬림 요약은 PascalCase. 프론트 호환을 위해 camelCase alias 추가. */
 function normalizeMatchForFrontend(obj: Record<string, unknown>): Record<string, unknown> {
   const out = { ...obj };
+  // Teams 내부 각 팀에 score/players alias
   const teams = out.Teams as Record<string, unknown> | undefined;
   if (teams && typeof teams === "object") {
     for (const key of Object.keys(teams)) {
@@ -18,6 +19,9 @@ function normalizeMatchForFrontend(obj: Record<string, unknown>): Record<string,
       }
     }
   }
+  // WinSide: 최상위 (새 포맷) 또는 Result 안 (하위 호환)
+  if (out.WinSide !== undefined && out.winSide === undefined)
+    out.winSide = out.WinSide;
   const result = out.Result as Record<string, unknown> | undefined;
   if (result && result.WinSide !== undefined && result.winSide === undefined)
     (result as Record<string, unknown>).winSide = result.WinSide;

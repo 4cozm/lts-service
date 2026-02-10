@@ -5,8 +5,9 @@ type MatchRecord = Record<string, unknown> & {
   FinishTime?: string;
   DurationSeconds?: number;
   Teams?: Record<string, { score?: number; Score?: number; players?: unknown[]; Players?: unknown[] }>;
-  Result?: { winTeamId?: unknown; winSide?: string; WinSide?: string; resultType?: string };
-  FirstBlood?: { killer?: unknown; victim?: unknown };
+  WinSide?: string;
+  winSide?: string;
+  Environment?: { GameType?: { Id?: string; Name?: string } };
 };
 
 const TEAM_STYLES: Record<string, { border: string; bg: string; title: string }> = {
@@ -21,31 +22,25 @@ function getTeamStyle(teamKey: string) {
   return TEAM_STYLES[teamKey] ?? DEFAULT_TEAM_STYLE;
 }
 
-type PlayerRecord = Record<string, unknown> & {
-  PlayerId?: number;
-  playerId?: number;
-  PlayerName?: string;
-  playerName?: string;
-  Kills?: number;
-  kills?: number;
-  Deaths?: number;
-  deaths?: number;
-  KD?: number;
-  kd?: number;
+type PlayerStats = {
   Score?: number;
-  score?: number;
+  Deaths?: number;
   Shots?: number;
-  shots?: number;
-  Hits?: number;
-  hits?: number;
-  Accuracy?: number;
-  accuracy?: number;
-  DamageDealt?: number;
-  damageDealt?: number;
-  FatalHits?: number;
-  fatalHits?: number;
+  ConsecutiveKills?: number;
   MaxConsecutiveKills?: number;
-  maxConsecutiveKills?: number;
+  ConsecutiveDeaths?: number;
+  NemesisPlayerId?: number | null;
+  Kills?: number;
+  Hits?: number;
+  TotalDamage?: number;
+  FatalHits?: number;
+};
+
+type PlayerRecord = Record<string, unknown> & {
+  PlayerName?: string;
+  DeviceId?: number;
+  PreconfiguredDeviceId?: number;
+  Statistics?: PlayerStats;
 };
 
 /** 12시간 형식, 초 제외 (예: 오후 7시 43분) */
@@ -64,16 +59,16 @@ function formatTimeShort(s: string | undefined): string {
 }
 
 function getPlayerDisplayName(p: PlayerRecord): string {
-  return String(p.PlayerName ?? p.playerName ?? p.PlayerId ?? p.playerId ?? "-");
+  return String(p.PlayerName ?? p.DeviceId ?? "-");
 }
 function num(v: unknown): number {
   if (v == null) return 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
-function pct(v: unknown): string {
-  const n = num(v);
-  return n > 0 ? `${(n * 100).toFixed(1)}%` : "-";
+function pct(shots: number, hits: number): string {
+  if (shots <= 0) return "-";
+  return `${((hits / shots) * 100).toFixed(1)}%`;
 }
 
 type Props = {
@@ -93,8 +88,8 @@ function getTeamScore(team: Record<string, unknown>): number | undefined {
 }
 
 function getMatchWinSide(match: MatchRecord): string | null {
-  const winSide = match.Result?.winSide ?? (match.Result as Record<string, unknown>)?.WinSide;
-  if (typeof winSide === "string" && winSide) return winSide;
+  const ws = match.winSide ?? match.WinSide;
+  if (typeof ws === "string" && ws) return ws;
   const entries = getTeamEntries(match);
   let maxScore = -1;
   let winner: string | null = null;
@@ -198,15 +193,18 @@ export default function MatchDetailModal({ match, onClose }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {players.map((p, i) => (
-                        <tr key={i} className="border-b border-white/5">
-                          <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
-                          <td className="text-right py-1">{num(p.Kills ?? p.kills)}/{num(p.Deaths ?? p.deaths)}</td>
-                          <td className="text-right py-1">{num(p.Score ?? p.score)}</td>
-                          <td className="text-right py-1">{pct(p.Accuracy ?? p.accuracy)}</td>
-                          <td className="text-right py-1">{num(p.DamageDealt ?? p.damageDealt)}</td>
-                        </tr>
-                      ))}
+                      {players.map((p, i) => {
+                        const st = p.Statistics;
+                        return (
+                          <tr key={i} className="border-b border-white/5">
+                            <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
+                            <td className="text-right py-1">{num(st?.Kills)}/{num(st?.Deaths)}</td>
+                            <td className="text-right py-1">{num(st?.Score)}</td>
+                            <td className="text-right py-1">{pct(num(st?.Shots), num(st?.Hits))}</td>
+                            <td className="text-right py-1">{num(st?.TotalDamage)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -249,11 +249,28 @@ namespace LtsIngestBridge
                 string? matchId = TryGetString(root, "Id");
                 string? matchName = TryGetString(root, "Name");
                 string? launchTime = TryGetString(root, "LaunchTime");
+                string? startTime = root.TryGetProperty("StartTime", out var stEl2) && stEl2.ValueKind == STJ.JsonValueKind.String
+                    ? stEl2.GetString() : null;
                 string? finishTime = TryGetString(root, "FinishTime");
 
                 double? durationSeconds = null;
                 if (DateTimeOffset.TryParse(launchTime, out var lt) && DateTimeOffset.TryParse(finishTime, out var ft))
                     durationSeconds = (ft - lt).TotalSeconds;
+
+                // Environment.GameType 추출
+                object? environment = null;
+                if (root.TryGetProperty("Environment", out var envEl) && envEl.ValueKind == STJ.JsonValueKind.Object &&
+                    envEl.TryGetProperty("GameType", out var gtEl) && gtEl.ValueKind == STJ.JsonValueKind.Object)
+                {
+                    environment = new
+                    {
+                        GameType = new
+                        {
+                            Id = TryGetString(gtEl, "Id"),
+                            Name = TryGetString(gtEl, "Name")
+                        }
+                    };
+                }
 
                 var idToName = new Dictionary<int, string>();
                 var teamsDict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -264,75 +281,59 @@ namespace LtsIngestBridge
                     var teamKey = teamProp.Name;
                     var teamEl = teamProp.Value;
                     string? teamId = TryGetString(teamEl, "Id");
-                    int? score = TryGetInt(teamEl, "Score");
+                    int? teamScore = TryGetInt(teamEl, "Score");
                     var players = ExtractSlimPlayers(teamEl, teamKey, idToName);
-                    teamsDict[teamKey] = new { Id = teamId, Score = score, Players = players };
+                    teamsDict[teamKey] = new { Score = teamScore, Players = players };
                     teamIdByKey[teamKey] = teamId;
                 }
 
+                // WinSide: Statistics.Result → 점수 비교 fallback
                 string? winTeamId = null;
-                int? resultType = null;
                 string? winSide = null;
-                object? firstBloodObj = null;
 
-                if (root.TryGetProperty("Statistics", out var matchStatsEl))
+                if (root.TryGetProperty("Statistics", out var matchStatsEl) &&
+                    matchStatsEl.TryGetProperty("Result", out var resultEl2) &&
+                    resultEl2.TryGetProperty("WinTeamIds", out var winIdsEl) &&
+                    winIdsEl.ValueKind == STJ.JsonValueKind.Array && winIdsEl.GetArrayLength() > 0)
                 {
-                    if (matchStatsEl.TryGetProperty("Result", out var resultEl))
+                    winTeamId = winIdsEl[0].GetString();
+                    foreach (var kv in teamIdByKey)
                     {
-                        if (resultEl.TryGetProperty("WinTeamIds", out var winIdsEl) &&
-                            winIdsEl.ValueKind == STJ.JsonValueKind.Array &&
-                            winIdsEl.GetArrayLength() > 0)
+                        if (winTeamId != null && kv.Value != null &&
+                            winTeamId.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))
                         {
-                            winTeamId = winIdsEl[0].GetString();
-                            foreach (var kv in teamIdByKey)
-                            {
-                                if (winTeamId != null && kv.Value != null &&
-                                    winTeamId.Equals(kv.Value, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    winSide = kv.Key;
-                                    break;
-                                }
-                            }
-                            if (winSide == null) winSide = "Unknown";
+                            winSide = kv.Key;
+                            break;
                         }
-                        resultType = TryGetInt(resultEl, "ResultType");
-                    }
-
-                    if (matchStatsEl.TryGetProperty("FirstBlood", out var fbEl) && fbEl.ValueKind == STJ.JsonValueKind.Object)
-                    {
-                        int? killerId = TryGetInt(fbEl, "ExterminatorPlayerId");
-                        int? victimId = TryGetInt(fbEl, "VictimPlayerId");
-
-                        string? killerName = (killerId.HasValue && idToName.TryGetValue(killerId.Value, out var kn)) ? kn : null;
-                        string? victimName = (victimId.HasValue && idToName.TryGetValue(victimId.Value, out var vn)) ? vn : null;
-
-                        firstBloodObj = new
-                        {
-                            KillerPlayerId = killerId,
-                            KillerName = killerName,
-                            VictimPlayerId = victimId,
-                            VictimName = victimName
-                        };
                     }
                 }
 
-                var resultObj = new Dictionary<string, object?>
+                // fallback: 가장 높은 팀 스코어로 WinSide 결정
+                if (string.IsNullOrWhiteSpace(winSide))
                 {
-                    ["WinTeamId"] = winTeamId,
-                    ["WinSide"] = winSide ?? "Unknown",
-                    ["ResultType"] = resultType
-                };
+                    int maxScore = -1;
+                    foreach (var teamProp in teamsEl.EnumerateObject())
+                    {
+                        int? s = TryGetInt(teamProp.Value, "Score");
+                        if (s.HasValue && s.Value > maxScore)
+                        {
+                            maxScore = s.Value;
+                            winSide = teamProp.Name;
+                        }
+                    }
+                }
 
                 var summary = new Dictionary<string, object?>
                 {
                     ["Id"] = matchId,
                     ["Name"] = matchName,
                     ["LaunchTime"] = launchTime,
+                    ["StartTime"] = startTime,
                     ["FinishTime"] = finishTime,
                     ["DurationSeconds"] = durationSeconds,
+                    ["Environment"] = environment,
                     ["Teams"] = teamsDict,
-                    ["Result"] = resultObj,
-                    ["FirstBlood"] = firstBloodObj
+                    ["WinSide"] = winSide
                 };
 
                 summaryJson = STJ.JsonSerializer.Serialize(summary);
@@ -353,132 +354,153 @@ namespace LtsIngestBridge
 
             foreach (var pEl in playersEl.EnumerateArray())
             {
-                int? playerId = null;
+                // ── 1) PlayerName: deep → flat ──
                 string? playerName = null;
-
+                // Deep: Entity.PlayerName → Entity.Settings.PlayerName
                 if (pEl.TryGetProperty("Entity", out var entityEl) && entityEl.ValueKind == STJ.JsonValueKind.Object)
                 {
                     playerName = TryGetString(entityEl, "PlayerName");
-                    if (string.IsNullOrWhiteSpace(playerName) && entityEl.TryGetProperty("Settings", out var settingsEl) && settingsEl.ValueKind == STJ.JsonValueKind.Object)
-                        playerName = TryGetString(settingsEl, "PlayerName");
+                    if (string.IsNullOrWhiteSpace(playerName) && entityEl.TryGetProperty("Settings", out var settEl) && settEl.ValueKind == STJ.JsonValueKind.Object)
+                        playerName = TryGetString(settEl, "PlayerName");
                 }
+                // Deep: Context.Info.Name
+                if (string.IsNullOrWhiteSpace(playerName) && pEl.TryGetProperty("Context", out var ctxForName) &&
+                    ctxForName.TryGetProperty("Info", out var infoForName) && infoForName.ValueKind == STJ.JsonValueKind.Object)
+                    playerName = TryGetString(infoForName, "Name");
+                // Flat: PlayerName directly on player
+                if (string.IsNullOrWhiteSpace(playerName))
+                    playerName = TryGetString(pEl, "PlayerName");
 
+                // ── 2) DeviceId / PreconfiguredDeviceId: deep → flat ──
+                int? deviceId = null;
+                int? preconfiguredDeviceId = null;
                 if (pEl.TryGetProperty("Context", out var ctxEl))
                 {
-                    if (string.IsNullOrWhiteSpace(playerName) &&
-                        ctxEl.TryGetProperty("Info", out var infoEl) && infoEl.ValueKind == STJ.JsonValueKind.Object)
-                        playerName = TryGetString(infoEl, "Name");
+                    deviceId = TryGetInt(ctxEl, "DeviceId");
+                    preconfiguredDeviceId = TryGetInt(ctxEl, "PreconfiguredDeviceId");
 
                     int? infoId = null;
-                    if (ctxEl.TryGetProperty("Info", out var infoEl2) && infoEl2.ValueKind == STJ.JsonValueKind.Object)
-                        infoId = TryGetInt(infoEl2, "Id");
-                    int? deviceId = TryGetInt(ctxEl, "DeviceId");
-                    int? preconfiguredDeviceId = TryGetInt(ctxEl, "PreconfiguredDeviceId");
-                    playerId = deviceId ?? preconfiguredDeviceId ?? infoId;
-                    if (playerId.HasValue && !string.IsNullOrWhiteSpace(playerName))
+                    if (ctxEl.TryGetProperty("Info", out var infoEl) && infoEl.ValueKind == STJ.JsonValueKind.Object)
+                        infoId = TryGetInt(infoEl, "Id");
+
+                    int? idForMap = deviceId ?? preconfiguredDeviceId ?? infoId;
+                    if (idForMap.HasValue && !string.IsNullOrWhiteSpace(playerName))
                     {
-                        idToName[playerId.Value] = playerName;
-                        if (infoId.HasValue && infoId.Value != playerId.Value)
+                        idToName[idForMap.Value] = playerName;
+                        if (infoId.HasValue && infoId.Value != idForMap.Value)
                             idToName[infoId.Value] = playerName;
                     }
                 }
+                // Flat fallback
+                deviceId ??= TryGetInt(pEl, "DeviceId");
+                preconfiguredDeviceId ??= TryGetInt(pEl, "PreconfiguredDeviceId");
+                // idToName for flat format
+                if (deviceId.HasValue && !string.IsNullOrWhiteSpace(playerName) && !idToName.ContainsKey(deviceId.Value))
+                    idToName[deviceId.Value] = playerName;
 
-                int kills = 0;
-                int deaths = 0;
-                int shots = 0;
-                int hits = 0;
-                double damage = 0;
-                int fatalHits = 0;
+                // ── 3) Statistics: deep (Context.Sessions[].Statistics) → flat (Statistics) ──
+                int kills = 0, deaths = 0, shots = 0, hits = 0, fatalHits = 0, score = 0;
+                double totalDamage = 0;
+                int? consecutiveKills = null, maxConsecutiveKills = null, consecutiveDeaths = null;
+                int? nemesisPlayerId = null;
+                bool statsFound = false;
 
-                int score = 0;
-                int? maxConsecutiveKills = null;
-
-                Dictionary<string, int>? medals = null;
-
-                if (pEl.TryGetProperty("Context", out var ctx2El) &&
-                    ctx2El.TryGetProperty("Sessions", out var sessionsEl) &&
+                // Deep path
+                if (pEl.TryGetProperty("Context", out var ctx2) &&
+                    ctx2.TryGetProperty("Sessions", out var sessionsEl) &&
                     sessionsEl.ValueKind == STJ.JsonValueKind.Array)
                 {
                     foreach (var sEl in sessionsEl.EnumerateArray())
                     {
                         if (!sEl.TryGetProperty("Statistics", out var stEl) || stEl.ValueKind != STJ.JsonValueKind.Object)
                             continue;
-
-                        deaths += TryGetInt(stEl, "Deaths") ?? 0;
-                        shots += TryGetInt(stEl, "Shots") ?? 0;
-                        score += TryGetInt(stEl, "Score") ?? 0;
-
-                        if (stEl.TryGetProperty("_killings", out var kEl) && kEl.ValueKind == STJ.JsonValueKind.Array)
-                            kills += kEl.GetArrayLength();
-
-                        if (stEl.TryGetProperty("OutHitsList", out var ohEl) && ohEl.ValueKind == STJ.JsonValueKind.Array)
-                        {
-                            foreach (var hitEl in ohEl.EnumerateArray())
-                            {
-                                hits++;
-
-                                if (hitEl.TryGetProperty("Damage", out var dmgEl) && dmgEl.ValueKind == STJ.JsonValueKind.Number)
-                                    damage += dmgEl.GetDouble();
-
-                                if (hitEl.TryGetProperty("IsFatalDamage", out var fatalEl) &&
-                                    (fatalEl.ValueKind == STJ.JsonValueKind.True || fatalEl.ValueKind == STJ.JsonValueKind.False) &&
-                                    fatalEl.GetBoolean())
-                                {
-                                    fatalHits++;
-                                }
-                            }
-                        }
-
-                        maxConsecutiveKills = MaxNullable(maxConsecutiveKills, TryGetInt(stEl, "MaxConsecutiveKills"));
-
-                        if (stEl.TryGetProperty("MedalsMap", out var medalsEl) && medalsEl.ValueKind == STJ.JsonValueKind.Object)
-                        {
-                            medals ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var prop in medalsEl.EnumerateObject())
-                            {
-                                int add;
-                                if (prop.Value.ValueKind == STJ.JsonValueKind.Number && prop.Value.TryGetInt32(out var mv))
-                                    add = mv;
-                                else if (prop.Value.ValueKind == STJ.JsonValueKind.Object)
-                                    add = TryGetInt(prop.Value, "CountMedals") ?? 0;
-                                else
-                                    continue;
-                                medals[prop.Name] = (medals.TryGetValue(prop.Name, out var cur) ? cur : 0) + add;
-                            }
-                        }
+                        statsFound = true;
+                        AccumulateStats(stEl, ref kills, ref deaths, ref shots, ref hits,
+                            ref totalDamage, ref fatalHits, ref score,
+                            ref consecutiveKills, ref maxConsecutiveKills,
+                            ref consecutiveDeaths, ref nemesisPlayerId);
                     }
                 }
 
-                double? accuracy = (shots > 0) ? (double)hits / shots : null;
-                double? kd = (deaths > 0) ? (double)kills / deaths : (double?)null;
+                // Flat fallback
+                if (!statsFound && pEl.TryGetProperty("Statistics", out var flatSt) && flatSt.ValueKind == STJ.JsonValueKind.Object)
+                {
+                    AccumulateStats(flatSt, ref kills, ref deaths, ref shots, ref hits,
+                        ref totalDamage, ref fatalHits, ref score,
+                        ref consecutiveKills, ref maxConsecutiveKills,
+                        ref consecutiveDeaths, ref nemesisPlayerId);
+                }
 
                 var playerObj = new
                 {
-                    PlayerId = playerId,
                     PlayerName = playerName,
-
-                    Kills = kills,
-                    Deaths = deaths,
-                    KD = kd,
-
-                    Score = score,
-
-                    Shots = shots,
-                    Hits = hits,
-                    Accuracy = accuracy,
-
-                    DamageDealt = damage,
-                    FatalHits = fatalHits,
-
-                    MaxConsecutiveKills = maxConsecutiveKills,
-
-                    Medals = medals
+                    DeviceId = deviceId,
+                    PreconfiguredDeviceId = preconfiguredDeviceId,
+                    Statistics = new
+                    {
+                        Score = score,
+                        Deaths = deaths,
+                        Shots = shots,
+                        ConsecutiveKills = consecutiveKills ?? 0,
+                        MaxConsecutiveKills = maxConsecutiveKills ?? 0,
+                        ConsecutiveDeaths = consecutiveDeaths ?? 0,
+                        NemesisPlayerId = nemesisPlayerId,
+                        Kills = kills,
+                        Hits = hits,
+                        TotalDamage = totalDamage,
+                        FatalHits = fatalHits
+                    }
                 };
 
                 list.Add(playerObj);
             }
 
             return list;
+        }
+
+        /// <summary>Statistics 엘리먼트에서 통계를 누적 (deep/flat 공통)</summary>
+        private static void AccumulateStats(
+            STJ.JsonElement stEl,
+            ref int kills, ref int deaths, ref int shots, ref int hits,
+            ref double totalDamage, ref int fatalHits, ref int score,
+            ref int? consecutiveKills, ref int? maxConsecutiveKills,
+            ref int? consecutiveDeaths, ref int? nemesisPlayerId)
+        {
+            deaths += TryGetInt(stEl, "Deaths") ?? 0;
+            shots += TryGetInt(stEl, "Shots") ?? 0;
+            score += TryGetInt(stEl, "Score") ?? 0;
+
+            // Kills: _killings 배열 → 직접 Kills 필드
+            if (stEl.TryGetProperty("_killings", out var kEl) && kEl.ValueKind == STJ.JsonValueKind.Array)
+                kills += kEl.GetArrayLength();
+            else
+                kills += TryGetInt(stEl, "Kills") ?? 0;
+
+            // Hits / TotalDamage / FatalHits: OutHitsList → 직접 필드
+            if (stEl.TryGetProperty("OutHitsList", out var ohEl) && ohEl.ValueKind == STJ.JsonValueKind.Array && ohEl.GetArrayLength() > 0)
+            {
+                foreach (var hitEl in ohEl.EnumerateArray())
+                {
+                    hits++;
+                    if (hitEl.TryGetProperty("Damage", out var dmgEl) && dmgEl.ValueKind == STJ.JsonValueKind.Number)
+                        totalDamage += dmgEl.GetDouble();
+                    if (hitEl.TryGetProperty("IsFatalDamage", out var fatalEl) &&
+                        (fatalEl.ValueKind == STJ.JsonValueKind.True || fatalEl.ValueKind == STJ.JsonValueKind.False) &&
+                        fatalEl.GetBoolean())
+                        fatalHits++;
+                }
+            }
+            else
+            {
+                hits += TryGetInt(stEl, "Hits") ?? 0;
+                totalDamage += TryGetDouble(stEl, "TotalDamage") ?? 0;
+                fatalHits += TryGetInt(stEl, "FatalHits") ?? 0;
+            }
+
+            consecutiveKills = MaxNullable(consecutiveKills, TryGetInt(stEl, "ConsecutiveKills"));
+            maxConsecutiveKills = MaxNullable(maxConsecutiveKills, TryGetInt(stEl, "MaxConsecutiveKills"));
+            consecutiveDeaths = MaxNullable(consecutiveDeaths, TryGetInt(stEl, "ConsecutiveDeaths"));
+            nemesisPlayerId ??= TryGetInt(stEl, "NemesisPlayerId");
         }
 
         private static int? MaxNullable(int? a, int? b)
@@ -502,6 +524,16 @@ namespace LtsIngestBridge
 
             if (el.ValueKind == STJ.JsonValueKind.Number && el.TryGetInt32(out var v)) return v;
             if (el.ValueKind == STJ.JsonValueKind.String && int.TryParse(el.GetString(), out var sv)) return sv;
+            return null;
+        }
+
+        private static double? TryGetDouble(STJ.JsonElement obj, string prop)
+        {
+            if (obj.ValueKind != STJ.JsonValueKind.Object) return null;
+            if (!obj.TryGetProperty(prop, out var el)) return null;
+
+            if (el.ValueKind == STJ.JsonValueKind.Number && el.TryGetDouble(out var v)) return v;
+            if (el.ValueKind == STJ.JsonValueKind.String && double.TryParse(el.GetString(), out var sv)) return sv;
             return null;
         }
 
