@@ -22,6 +22,24 @@ function getTeamStyle(teamKey: string) {
   return TEAM_STYLES[teamKey] ?? DEFAULT_TEAM_STYLE;
 }
 
+/** 어두운 배경에서 가시성 좋은 팀 컬러 */
+const TEAM_COLOR: Record<string, string> = {
+  Red: "#f87171",
+  Blue: "#60a5fa",
+  Yellow: "#facc15",
+  Green: "#4ade80",
+  Purple: "#c084fc",
+};
+const DEFAULT_TEAM_COLOR = "#94a3b8";
+function getTeamColor(teamKey: string): string {
+  return TEAM_COLOR[teamKey] ?? DEFAULT_TEAM_COLOR;
+}
+
+function kd(kills: number, deaths: number): string {
+  if (deaths === 0) return kills > 0 ? kills.toFixed(2) : "0.00";
+  return (kills / deaths).toFixed(2);
+}
+
 type PlayerStats = {
   Score?: number;
   Deaths?: number;
@@ -112,11 +130,19 @@ export default function MatchDetailModal({ match, onClose }: Props) {
   const durationSec = match.DurationSeconds;
   const durationMin = durationSec != null ? (durationSec / 60).toFixed(1) : null;
 
+  // 모달 너비: 팀 수에 따라 자동 확장
+  const teamsWithPlayers = teamEntries.filter(([, team]) => {
+    const players = (team.players ?? team.Players) as PlayerRecord[] | undefined;
+    return players && players.length > 0;
+  });
+  const teamCount = teamsWithPlayers.length;
+  const modalMaxW = teamCount <= 2 ? "max-w-2xl" : teamCount === 3 ? "max-w-4xl" : "max-w-6xl";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
       <div
-        className="glass relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl p-6"
+        className={`glass relative z-10 w-full ${modalMaxW} max-h-[90vh] overflow-y-auto rounded-xl p-6`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -154,31 +180,32 @@ export default function MatchDetailModal({ match, onClose }: Props) {
           </div>
         </dl>
 
-        {/* 팀 스코어: 몇 대 몇, 누가 이겼는지 (동적 팀) */}
+        {/* 승리팀 + 팀 스코어 (컬러) */}
         {teamEntries.length > 0 && (
-          <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-            <h3 className="text-slate-400 text-xs font-medium mb-2">팀 스코어</h3>
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="mt-4 p-4 rounded-lg bg-white/5 border border-white/10 text-center">
+            {winSide != null && (
+              <div className="text-sm font-semibold mb-1" style={{ color: getTeamColor(winSide) }}>
+                {winSide} 승리
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-1 text-xl font-bold">
               {teamEntries.map(([teamKey, team], i) => (
-                <span key={teamKey}>
-                  {i > 0 && <span className="text-slate-500 mx-0.5">:</span>}
-                  <span className="font-medium">{teamKey} {getTeamScore(team) ?? "-"}</span>
+                <span key={teamKey} className="inline-flex items-center">
+                  {i > 0 && <span className="text-slate-500 mx-1.5 text-base font-normal">:</span>}
+                  <span style={{ color: getTeamColor(teamKey) }}>{getTeamScore(team) ?? "-"}</span>
                 </span>
               ))}
-              {winSide != null && (
-                <span className="text-cyan-400 font-medium ml-1">· {winSide} 승</span>
-              )}
             </div>
           </div>
         )}
 
-        {/* 선수 세부: 팀별 테이블 (동적 팀) — 1팀=풀폭, 2팀=2열, 3~4팀=2열 */}
+        {/* 선수 세부: 팀별 테이블 — 팀 수에 따라 자동 열 확장 */}
         {(() => {
-          const teamsWithPlayers = teamEntries.filter(([, team]) => {
-            const players = (team.players ?? team.Players) as PlayerRecord[] | undefined;
-            return players && players.length > 0;
-          });
-          const gridCols = teamsWithPlayers.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
+          const gridCols =
+            teamCount === 1 ? "grid-cols-1"
+            : teamCount === 2 ? "grid-cols-1 md:grid-cols-2"
+            : teamCount === 3 ? "grid-cols-1 md:grid-cols-3"
+            : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
           return (
             <div className={`mt-4 grid ${gridCols} gap-4`}>
               {teamsWithPlayers.map(([teamKey, team]) => {
@@ -192,21 +219,25 @@ export default function MatchDetailModal({ match, onClose }: Props) {
                         <thead>
                           <tr className="text-slate-500 border-b border-white/10">
                             <th className="text-left py-1 pr-2">닉네임</th>
-                            <th className="text-right py-1">K/D</th>
-                            <th className="text-right py-1">점수</th>
+                            <th className="text-right py-1">K</th>
+                            <th className="text-right py-1">D</th>
                             <th className="text-right py-1">명중</th>
-                            <th className="text-right py-1">피해</th>
+                            <th className="text-right py-1">K/D</th>
+                            <th className="text-right py-1">피해량</th>
                           </tr>
                         </thead>
                         <tbody>
                           {players.map((p, i) => {
                             const st = p.Statistics;
+                            const k = num(st?.Kills);
+                            const d = num(st?.Deaths);
                             return (
                               <tr key={i} className="border-b border-white/5">
                                 <td className="py-1 pr-2 truncate max-w-[120px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
-                                <td className="text-right py-1">{num(st?.Kills)}/{num(st?.Deaths)}</td>
-                                <td className="text-right py-1">{num(st?.Score)}</td>
+                                <td className="text-right py-1">{k}</td>
+                                <td className="text-right py-1">{d}</td>
                                 <td className="text-right py-1">{pct(num(st?.Shots), num(st?.Hits))}</td>
+                                <td className="text-right py-1">{kd(k, d)}</td>
                                 <td className="text-right py-1">{num(st?.TotalDamage)}</td>
                               </tr>
                             );
