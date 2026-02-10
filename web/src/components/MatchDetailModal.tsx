@@ -172,46 +172,54 @@ export default function MatchDetailModal({ match, onClose }: Props) {
           </div>
         )}
 
-        {/* 선수 세부: 팀별 테이블 (동적 팀) */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {teamEntries.map(([teamKey, team]) => {
+        {/* 선수 세부: 팀별 테이블 (동적 팀) — 1팀=풀폭, 2팀=2열, 3~4팀=2열 */}
+        {(() => {
+          const teamsWithPlayers = teamEntries.filter(([, team]) => {
             const players = (team.players ?? team.Players) as PlayerRecord[] | undefined;
-            const style = getTeamStyle(teamKey);
-            if (!players?.length) return null;
-            return (
-              <div key={teamKey} className={`rounded-lg border ${style.border} ${style.bg} p-3`}>
-                <h3 className={`${style.title} text-xs font-semibold mb-2`}>{teamKey} ({players.length}명)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-slate-500 border-b border-white/10">
-                        <th className="text-left py-1 pr-2">닉네임</th>
-                        <th className="text-right py-1">K/D</th>
-                        <th className="text-right py-1">점수</th>
-                        <th className="text-right py-1">명중</th>
-                        <th className="text-right py-1">피해</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {players.map((p, i) => {
-                        const st = p.Statistics;
-                        return (
-                          <tr key={i} className="border-b border-white/5">
-                            <td className="py-1 pr-2 truncate max-w-[100px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
-                            <td className="text-right py-1">{num(st?.Kills)}/{num(st?.Deaths)}</td>
-                            <td className="text-right py-1">{num(st?.Score)}</td>
-                            <td className="text-right py-1">{pct(num(st?.Shots), num(st?.Hits))}</td>
-                            <td className="text-right py-1">{num(st?.TotalDamage)}</td>
+            return players && players.length > 0;
+          });
+          const gridCols = teamsWithPlayers.length === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
+          return (
+            <div className={`mt-4 grid ${gridCols} gap-4`}>
+              {teamsWithPlayers.map(([teamKey, team]) => {
+                const players = (team.players ?? team.Players) as PlayerRecord[];
+                const style = getTeamStyle(teamKey);
+                return (
+                  <div key={teamKey} className={`rounded-lg border ${style.border} ${style.bg} p-3`}>
+                    <h3 className={`${style.title} text-xs font-semibold mb-2`}>{teamKey} ({players.length}명)</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-white/10">
+                            <th className="text-left py-1 pr-2">닉네임</th>
+                            <th className="text-right py-1">K/D</th>
+                            <th className="text-right py-1">점수</th>
+                            <th className="text-right py-1">명중</th>
+                            <th className="text-right py-1">피해</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                        </thead>
+                        <tbody>
+                          {players.map((p, i) => {
+                            const st = p.Statistics;
+                            return (
+                              <tr key={i} className="border-b border-white/5">
+                                <td className="py-1 pr-2 truncate max-w-[120px]" title={getPlayerDisplayName(p)}>{getPlayerDisplayName(p)}</td>
+                                <td className="text-right py-1">{num(st?.Kills)}/{num(st?.Deaths)}</td>
+                                <td className="text-right py-1">{num(st?.Score)}</td>
+                                <td className="text-right py-1">{pct(num(st?.Shots), num(st?.Hits))}</td>
+                                <td className="text-right py-1">{num(st?.TotalDamage)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
       </div>
     </div>

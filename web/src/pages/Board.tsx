@@ -238,45 +238,63 @@ export default function Board() {
           ) : !matchesData?.matches?.length ? (
             <div className="p-4 text-slate-500">당일 경기 기록이 없습니다.</div>
           ) : (
-            <ul className="divide-y divide-white/5">
-              {[...matchesData.matches]
-                .sort((a, b) => {
-                  const ta = a.FinishTime ? new Date(a.FinishTime as string).getTime() : 0;
-                  const tb = b.FinishTime ? new Date(b.FinishTime as string).getTime() : 0;
-                  return tb - ta;
-                })
-                .map((match) => {
-                  const id = String(match.Id ?? "");
-                  const isSelected = selectedMatchIds.has(id);
-                  const teamEntries = getTeamEntries(match);
-                  const scoreStr = teamEntries.map(([, t]) => getTeamScore(t) ?? "-").join(" : ");
-                  const winSide = getMatchWinSide(match);
-                  return (
-                    <li
-                      key={id}
-                      className="flex items-center gap-2 p-2 hover:bg-white/5 cursor-pointer"
-                      onClick={(e) => {
-                        if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
-                        setDetailMatch(match);
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleMatchSelection(id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded"
-                      />
-                      <span className="flex-1 truncate">{String(match.Name ?? "-")}</span>
-                      <span className="text-slate-400 text-xs shrink-0">{formatFinishTime(match.FinishTime as string)}</span>
-                      <span className="text-xs shrink-0 min-w-0 truncate" title={scoreStr}>{scoreStr || "-"}</span>
-                      <span className="text-cyan-400 text-xs font-medium shrink-0 w-14 text-right">
-                        {winSide != null ? `${winSide} 승` : "-"}
-                      </span>
-                    </li>
-                  );
-                })}
-            </ul>
+            <div>
+              {/* 헤더 */}
+              <div
+                className="grid items-center gap-2 px-2 py-1.5 text-[11px] text-slate-500 font-medium border-b border-white/10"
+                style={{ gridTemplateColumns: "24px 1fr 100px 72px 90px" }}
+              >
+                <span />
+                <span>경기 이름</span>
+                <span className="text-center">점수</span>
+                <span className="text-center">승리</span>
+                <span className="text-right">종료 시간</span>
+              </div>
+              {/* 행 */}
+              <ul className="divide-y divide-white/5">
+                {[...matchesData.matches]
+                  .sort((a, b) => {
+                    const ta = a.FinishTime ? new Date(a.FinishTime as string).getTime() : 0;
+                    const tb = b.FinishTime ? new Date(b.FinishTime as string).getTime() : 0;
+                    return tb - ta;
+                  })
+                  .map((match) => {
+                    const id = String(match.Id ?? "");
+                    const isSelected = selectedMatchIds.has(id);
+                    const teamEntries = getTeamEntries(match);
+                    const scoreStr = teamEntries.map(([key, t]) => {
+                      const s = getTeamScore(t);
+                      return s != null ? `${key[0]}${s}` : `${key[0]}-`;
+                    }).join(" : ");
+                    const winSide = getMatchWinSide(match);
+                    return (
+                      <li
+                        key={id}
+                        className="grid items-center gap-2 px-2 py-2 hover:bg-white/5 cursor-pointer"
+                        style={{ gridTemplateColumns: "24px 1fr 100px 72px 90px" }}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+                          setDetailMatch(match);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleMatchSelection(id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded shrink-0"
+                        />
+                        <span className="truncate text-sm">{String(match.Name ?? "-")}</span>
+                        <span className="text-xs text-center truncate" title={scoreStr}>{scoreStr || "-"}</span>
+                        <span className="text-xs text-center font-medium text-cyan-400 truncate">
+                          {winSide != null ? `${winSide} 승` : "-"}
+                        </span>
+                        <span className="text-xs text-right text-slate-400">{formatFinishTime(match.FinishTime as string)}</span>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </div>
           )}
         </div>
       </section>
