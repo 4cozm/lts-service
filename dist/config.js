@@ -16,6 +16,8 @@ const envSchema = z.object({
     REDIS_URL: z.string().url(),
     FIREBASE_PROJECT_ID: z.string().optional(),
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
+    FIREBASE_SYNC_INTERVAL_MS: z.coerce.number().optional(),
+    FIREBASE_MATCHES_COLLECTION: z.string().optional(),
 });
 function loadEnv() {
     const raw = {
@@ -30,6 +32,8 @@ function loadEnv() {
         REDIS_URL: process.env.REDIS_URL,
         FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
         FIREBASE_SERVICE_ACCOUNT_PATH: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+        FIREBASE_SYNC_INTERVAL_MS: process.env.FIREBASE_SYNC_INTERVAL_MS,
+        FIREBASE_MATCHES_COLLECTION: process.env.FIREBASE_MATCHES_COLLECTION,
     };
     return envSchema.parse(raw);
 }

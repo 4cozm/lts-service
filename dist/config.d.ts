@@ -11,6 +11,8 @@ declare const envSchema: z.ZodObject<{
     REDIS_URL: z.ZodString;
     FIREBASE_PROJECT_ID: z.ZodOptional<z.ZodString>;
     FIREBASE_SERVICE_ACCOUNT_PATH: z.ZodOptional<z.ZodString>;
+    FIREBASE_SYNC_INTERVAL_MS: z.ZodOptional<z.ZodNumber>;
+    FIREBASE_MATCHES_COLLECTION: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     NODE_ENV: "development" | "production" | "test";
     PORT: number;
@@ -23,6 +25,8 @@ declare const envSchema: z.ZodObject<{
     REDIS_URL: string;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
+    FIREBASE_SYNC_INTERVAL_MS?: number | undefined;
+    FIREBASE_MATCHES_COLLECTION?: string | undefined;
 }, {
     STAFF_ID: string;
     STAFF_PW: string;
@@ -35,6 +39,8 @@ declare const envSchema: z.ZodObject<{
     JWT_EXPIRES_IN?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
+    FIREBASE_SYNC_INTERVAL_MS?: number | undefined;
+    FIREBASE_MATCHES_COLLECTION?: string | undefined;
 }>;
 export type Config = z.infer<typeof envSchema>;
 export declare const config: {
@@ -49,5 +55,7 @@ export declare const config: {
     REDIS_URL: string;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
+    FIREBASE_SYNC_INTERVAL_MS?: number | undefined;
+    FIREBASE_MATCHES_COLLECTION?: string | undefined;
 };
 export {};

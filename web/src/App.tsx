@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import StaffLogin from "./pages/StaffLogin";
 import Register from "./pages/Register";
 import Board from "./pages/Board";
+import Display from "./pages/Display";
 
 function RequireStaff({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -25,6 +26,7 @@ export default function App() {
           }
         />
         <Route path="/match" element={<Board />} />
+        <Route path="/display" element={<Display />} />
       </Routes>
     </AuthProvider>
   );

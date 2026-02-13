@@ -139,6 +139,7 @@ export default function Board() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailMatch, setDetailMatch] = useState<MatchRecord | null>(null);
   const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
+  const [publishStatus, setPublishStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["board"], queryFn: fetchBoard });
   const {
@@ -238,11 +239,31 @@ export default function Board() {
             </button>
             <button
               type="button"
-              className="rounded-lg px-3 py-2 text-sm font-medium bg-slate-500/20 text-slate-300 border border-slate-500/30"
-              onClick={() => {}}
+              disabled={selectedMatchIds.size === 0 || publishStatus === "loading"}
+              className="rounded-lg px-3 py-2 text-sm font-medium bg-slate-500/20 text-slate-300 border border-slate-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={async () => {
+                if (selectedMatchIds.size === 0) return;
+                setPublishStatus("loading");
+                try {
+                  const res = await fetch("/api/board/publish", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ matchIds: Array.from(selectedMatchIds) }),
+                  });
+                  if (!res.ok) throw new Error(await res.text());
+                  setPublishStatus("ok");
+                  setTimeout(() => setPublishStatus("idle"), 2000);
+                } catch {
+                  setPublishStatus("error");
+                  setTimeout(() => setPublishStatus("idle"), 3000);
+                }
+              }}
             >
-              발행
+              {publishStatus === "loading" ? "발행 중…" : publishStatus === "ok" ? "발행 완료" : "발행"}
             </button>
+            {publishStatus === "error" && (
+              <span className="text-red-400 text-xs self-center">발행 실패</span>
+            )}
           </div>
         </div>
         <div className="h-64 overflow-y-auto border border-white/10 rounded-lg">

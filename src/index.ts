@@ -4,6 +4,7 @@ import { spawn } from "child_process";
 import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { startIngestFromStream } from "./ingest/streamIngest.js";
+import { startFirebaseSyncCron } from "./ingest/firebaseSync.js";
 
 const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/f5f9e2b5-6e29-44c2-98b6-e53c33291b35";
 
@@ -17,6 +18,7 @@ async function main() {
   // #endregion
   const log = app.log;
   startIngestFromStream(log);
+  startFirebaseSyncCron(log);
   const bridgePath = path.join(process.cwd(), "ingest-bridge");
   const child = spawn("dotnet", ["run", "--project", bridgePath], {
     cwd: process.cwd(),

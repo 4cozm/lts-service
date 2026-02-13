@@ -1,7 +1,33 @@
 import { getRedis } from "../redis.js";
 import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
+import { broadcastDisplay } from "../displayWs.js";
+import { aggregatePlayersFromMatches, setPublishedPayload, } from "../lib/boardPublished.js";
 const MATCH_IDS_SET = "match:ids";
 const MATCHES_KEY_PREFIX = "match:";
+/** C# 슬림 요약은 PascalCase. 프론트 호환을 위해 camelCase alias 추가. */
+function normalizeMatchForFrontend(obj) {
+    const out = { ...obj };
+    // Teams 내부 각 팀에 score/players alias
+    const teams = out.Teams;
+    if (teams && typeof teams === "object") {
+        for (const key of Object.keys(teams)) {
+            const team = teams[key];
+            if (team && typeof team === "object") {
+                if (team.Score !== undefined && team.score === undefined)
+                    team.score = team.Score;
+                if (team.Players !== undefined && team.players === undefined)
+                    team.players = team.Players;
+            }
+        }
+    }
+    // WinSide: 최상위 (새 포맷) 또는 Result 안 (하위 호환)
+    if (out.WinSide !== undefined && out.winSide === undefined)
+        out.winSide = out.WinSide;
+    const result = out.Result;
+    if (result && result.WinSide !== undefined && result.winSide === undefined)
+        result.winSide = result.WinSide;
+    return out;
+}
 const WAITING = "waiting";
 const PLAYING = "playing";
 const DONE = "done";
@@ -49,9 +75,13 @@ export async function boardRoutes(app) {
         const ids = await redis.smembers(MATCH_IDS_SET);
         const todayKst = getTodayDateString();
         const matches = [];
-        for (const id of ids) {
-            const raw = await redis.get(`${MATCHES_KEY_PREFIX}${id}`);
-            if (!raw)
+        if (ids.length === 0)
+            return reply.send({ matches });
+        const keys = ids.map((id) => `${MATCHES_KEY_PREFIX}${id}`);
+        const raws = await redis.mget(...keys);
+        for (let i = 0; i < ids.length; i++) {
+            const raw = raws[i];
+            if (!raw || typeof raw !== "string")
                 continue;
             try {
                 const obj = JSON.parse(raw);
@@ -68,7 +98,10 @@ export async function boardRoutes(app) {
                 const dateStr = `${y}-${mth}-${d}`;
                 if (dateStr !== todayKst)
                     continue;
-                matches.push(obj);
+                const durationSec = obj.DurationSeconds;
+                if (typeof durationSec === "number" && durationSec <= 360)
+                    continue;
+                matches.push(normalizeMatchForFrontend(obj));
             }
             catch {
                 continue;
@@ -114,5 +147,44 @@ export async function boardRoutes(app) {
         await redis.sadd(`${key}:${WAITING}`, id);
         await redis.set(`${key}:entry:${id}`, JSON.stringify({ id, nickname, createdAt }));
         return reply.send(entry);
+    });
+    app.post("/api/board/publish", {
+        schema: {
+            body: { type: "object", required: ["matchIds"], properties: { matchIds: { type: "array", items: { type: "string" } } } },
+        },
+    }, async (req, reply) => {
+        const { matchIds } = req.body;
+        const redis = getRedis();
+        if (!matchIds?.length) {
+            return reply.status(400).send({ error: "matchIds required (non-empty array)" });
+        }
+        const keys = matchIds.map((id) => `${MATCHES_KEY_PREFIX}${id}`);
+        const raws = await redis.mget(...keys);
+        const matches = [];
+        const validIds = [];
+        for (let i = 0; i < matchIds.length; i++) {
+            const raw = raws[i];
+            if (!raw || typeof raw !== "string")
+                continue;
+            try {
+                const obj = JSON.parse(raw);
+                if (obj && typeof obj === "object" && obj.Teams) {
+                    matches.push(obj);
+                    validIds.push(matchIds[i]);
+                }
+            }
+            catch {
+                continue;
+            }
+        }
+        const players = aggregatePlayersFromMatches(matches);
+        const payload = {
+            matchIds: validIds,
+            players,
+            updatedAt: new Date().toISOString(),
+        };
+        await setPublishedPayload(redis, payload);
+        broadcastDisplay(payload);
+        return reply.send(payload);
     });
 }

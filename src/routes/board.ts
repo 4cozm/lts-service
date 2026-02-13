@@ -1,6 +1,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRedis } from "../redis.js";
 import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
+import { broadcastDisplay } from "../displayWs.js";
+import {
+  aggregatePlayersFromMatches,
+  setPublishedPayload,
+  type PublishedPayload,
+} from "../lib/boardPublished.js";
+import type { MatchLine } from "../ingest/matchSchema.js";
 
 const MATCH_IDS_SET = "match:ids";
 const MATCHES_KEY_PREFIX = "match:";
@@ -163,6 +170,50 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
       await redis.sadd(`${key}:${WAITING}`, id);
       await redis.set(`${key}:entry:${id}`, JSON.stringify({ id, nickname, createdAt }));
       return reply.send(entry);
+    }
+  );
+
+  app.post<{
+    Body: { matchIds: string[] };
+  }>(
+    "/api/board/publish",
+    {
+      schema: {
+        body: { type: "object", required: ["matchIds"], properties: { matchIds: { type: "array", items: { type: "string" } } } },
+      },
+    },
+    async (req: FastifyRequest<{ Body: { matchIds: string[] } }>, reply: FastifyReply) => {
+      const { matchIds } = req.body;
+      const redis = getRedis();
+      if (!matchIds?.length) {
+        return reply.status(400).send({ error: "matchIds required (non-empty array)" });
+      }
+      const keys = matchIds.map((id) => `${MATCHES_KEY_PREFIX}${id}`);
+      const raws = await redis.mget(...keys);
+      const matches: MatchLine[] = [];
+      const validIds: string[] = [];
+      for (let i = 0; i < matchIds.length; i++) {
+        const raw = raws[i];
+        if (!raw || typeof raw !== "string") continue;
+        try {
+          const obj = JSON.parse(raw) as MatchLine;
+          if (obj && typeof obj === "object" && obj.Teams) {
+            matches.push(obj);
+            validIds.push(matchIds[i]);
+          }
+        } catch {
+          continue;
+        }
+      }
+      const players = aggregatePlayersFromMatches(matches);
+      const payload: PublishedPayload = {
+        matchIds: validIds,
+        players,
+        updatedAt: new Date().toISOString(),
+      };
+      await setPublishedPayload(redis, payload);
+      broadcastDisplay(payload);
+      return reply.send(payload);
     }
   );
 }
