@@ -76,6 +76,46 @@ export default function Display() {
   const players = payload?.players ?? [];
   const hasData = players.length > 0;
 
+  // 행별 숫자 값 (컬럼 순서: 킬, 데스, 평균명중률, 평균데미지, 총데미지, 승률, 합산점수)
+  const rowValues = players.map((p) => {
+    const shots = p.totalShots ?? 0;
+    const hits = p.totalHits ?? 0;
+    const damage = p.totalDamage ?? 0;
+    const games = p.gamesPlayed || 1;
+    const avgAccuracy = shots > 0 ? (hits / shots) * 100 : 0;
+    const avgDamage = games > 0 ? damage / games : 0;
+    const winRate = games > 0 ? (p.wins / games) * 100 : 0;
+    return {
+      kills: p.totalKills ?? 0,
+      deaths: p.totalDeaths ?? 0,
+      avgAccuracy,
+      avgDamage,
+      totalDamage: damage,
+      winRate,
+      totalScore: p.totalScore,
+    };
+  });
+
+  const columns = ["kills", "deaths", "avgAccuracy", "avgDamage", "totalDamage", "winRate", "totalScore"] as const;
+  const minMax = columns.map((col) => {
+    const vals = rowValues.map((r) => r[col]).filter((v) => v > 0 || col === "deaths" || col === "totalScore");
+    const valid = vals.length ? vals : rowValues.map((r) => r[col]);
+    return {
+      min: valid.length ? Math.min(...valid) : 0,
+      max: valid.length ? Math.max(...valid) : 0,
+    };
+  });
+
+  const getCellClass = (colIndex: number, value: number, display: string): string => {
+    const base = "py-4 px-6 text-center";
+    if (display === "-") return base;
+    const { min, max } = minMax[colIndex];
+    if (min === max) return base;
+    if (value === max) return `${base} text-rose-400`;
+    if (value === min) return `${base} text-sky-400`;
+    return base;
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-12">
       <div className="w-full max-w-full">
@@ -96,38 +136,36 @@ export default function Display() {
             className="rounded-2xl border-2 border-white/10 bg-white/5 overflow-y-auto overflow-x-auto"
             style={{ maxHeight: "calc(100vh - 14rem)" }}
           >
-            <table className="w-full text-left min-w-[960px] text-lg">
+            <table className="w-full min-w-[960px] text-2xl">
               <thead className="sticky top-0 bg-slate-900/95 z-10">
-                <tr className="border-b-2 border-white/10 text-slate-400 text-base">
-                  <th className="py-6 px-6 font-medium">이름</th>
-                  <th className="py-6 px-6 font-medium text-right">합산 킬</th>
-                  <th className="py-6 px-6 font-medium text-right">합산 데스</th>
-                  <th className="py-6 px-6 font-medium text-right">평균 명중률</th>
-                  <th className="py-6 px-6 font-medium text-right">평균 데미지</th>
-                  <th className="py-6 px-6 font-medium text-right">총합 데미지</th>
-                  <th className="py-6 px-6 font-medium text-right">승률</th>
-                  <th className="py-6 px-6 font-medium text-right">합산 점수</th>
+                <tr className="border-b-2 border-white/10 text-slate-400 text-2xl">
+                  <th className="py-6 px-6 font-medium text-center">이름</th>
+                  <th className="py-6 px-6 font-medium text-center">합산 킬</th>
+                  <th className="py-6 px-6 font-medium text-center">합산 데스</th>
+                  <th className="py-6 px-6 font-medium text-center">평균 명중률</th>
+                  <th className="py-6 px-6 font-medium text-center">평균 데미지</th>
+                  <th className="py-6 px-6 font-medium text-center">총합 데미지</th>
+                  <th className="py-6 px-6 font-medium text-center">승률</th>
+                  <th className="py-6 px-6 font-medium text-center">합산 점수</th>
                 </tr>
               </thead>
               <tbody>
-                {players.map((p) => {
-                  const shots = p.totalShots ?? 0;
-                  const hits = p.totalHits ?? 0;
-                  const damage = p.totalDamage ?? 0;
-                  const games = p.gamesPlayed || 1;
-                  const avgAccuracy = shots > 0 ? (hits / shots) * 100 : 0;
-                  const avgDamage = games > 0 ? damage / games : 0;
-                  const winRate = games > 0 ? (p.wins / games) * 100 : 0;
+                {players.map((p, rowIndex) => {
+                  const r = rowValues[rowIndex];
+                  const avgAccDisp = r.avgAccuracy > 0 ? `${r.avgAccuracy.toFixed(1)}%` : "-";
+                  const avgDmgDisp = r.avgDamage > 0 ? Math.round(r.avgDamage) : "-";
+                  const totalDmgDisp = r.totalDamage > 0 ? r.totalDamage : "-";
+                  const winRateDisp = r.winRate > 0 ? `${r.winRate.toFixed(1)}%` : "0%";
                   return (
                     <tr key={p.deviceId} className="border-b-2 border-white/5 hover:bg-white/5">
-                      <td className="py-4 px-6 font-medium truncate max-w-[240px]">{p.name}</td>
-                      <td className="py-4 px-6 text-right">{p.totalKills ?? 0}</td>
-                      <td className="py-4 px-6 text-right">{p.totalDeaths ?? 0}</td>
-                      <td className="py-4 px-6 text-right">{avgAccuracy > 0 ? `${avgAccuracy.toFixed(1)}%` : "-"}</td>
-                      <td className="py-4 px-6 text-right">{avgDamage > 0 ? Math.round(avgDamage) : "-"}</td>
-                      <td className="py-4 px-6 text-right">{damage > 0 ? damage : "-"}</td>
-                      <td className="py-4 px-6 text-right">{winRate > 0 ? `${winRate.toFixed(1)}%` : "0%"}</td>
-                      <td className="py-4 px-6 text-right font-semibold">{p.totalScore}</td>
+                      <td className="py-4 px-6 font-medium text-center truncate max-w-[240px]">{p.name}</td>
+                      <td className={getCellClass(0, r.kills, String(r.kills))}>{r.kills}</td>
+                      <td className={getCellClass(1, r.deaths, String(r.deaths))}>{r.deaths}</td>
+                      <td className={getCellClass(2, r.avgAccuracy, avgAccDisp)}>{avgAccDisp}</td>
+                      <td className={getCellClass(3, r.avgDamage, avgDmgDisp === "-" ? "-" : String(avgDmgDisp))}>{avgDmgDisp}</td>
+                      <td className={getCellClass(4, r.totalDamage, totalDmgDisp === "-" ? "-" : String(totalDmgDisp))}>{totalDmgDisp}</td>
+                      <td className={getCellClass(5, r.winRate, winRateDisp)}>{winRateDisp}</td>
+                      <td className={`${getCellClass(6, r.totalScore, String(r.totalScore))} font-semibold`}>{r.totalScore}</td>
                     </tr>
                   );
                 })}
