@@ -145,6 +145,7 @@ export default function Board() {
   const {
     data: matchesData,
     isLoading: matchesLoading,
+    isFetching: matchesFetching,
     refetch: refetchMatches,
   } = useQuery({
     queryKey: ["board-matches"],
@@ -232,10 +233,11 @@ export default function Board() {
           <div className="flex gap-2">
             <button
               type="button"
+              disabled={matchesFetching}
               onClick={() => refetchMatches()}
-              className="btn-primary py-2 px-3 text-sm"
+              className="btn-primary py-2 px-3 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              새로고침
+              {matchesFetching ? "새로고침 중…" : "새로고침"}
             </button>
             <button
               type="button"
