@@ -32,8 +32,17 @@ async function main() {
     if (code != null && code !== 0) log.warn(`경기 수집 브릿지 종료 (코드 ${code})`);
     if (signal) log.warn(`경기 수집 브릿지 시그널 종료: ${signal}`);
   });
+
+  function shutdownBridgeThenExit(signal: string): void {
+    if (!child.killed) {
+      child.kill(signal as NodeJS.Signals);
+    }
+    process.exit(0);
+  }
+  process.on("SIGINT", () => shutdownBridgeThenExit("SIGINT"));
+  process.on("SIGTERM", () => shutdownBridgeThenExit("SIGTERM"));
   process.on("exit", () => {
-    child.kill();
+    if (!child.killed) child.kill();
   });
   // #region agent log
   fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "index.ts:before listen", message: "before app.listen", data: { port: config.PORT }, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H5" }) }).catch(() => {});
