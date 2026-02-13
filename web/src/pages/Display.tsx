@@ -58,10 +58,8 @@ export default function Display() {
     };
   }, []);
 
-  // 자동 스크롤: 플레이어 5명 초과이고 컨텐츠가 넘칠 때만 천천히 아래로 스크롤 후 맨 위로
+  // 자동 스크롤: 컨텐츠가 화면 밖으로 넘치면 천천히 아래로 스크롤 후 맨 위로
   useEffect(() => {
-    const count = payload?.players?.length ?? 0;
-    if (count <= 5) return;
     const el = scrollRef.current;
     if (!el) return;
     const tick = (): void => {
@@ -109,7 +107,7 @@ export default function Display() {
   });
 
   const getCellClass = (colIndex: number, value: number, display: string): string => {
-    const base = "py-4 px-6 text-center";
+    const base = "py-4 px-2 text-center";
     if (display === "-") return base;
     const { min, max } = minMax[colIndex];
     if (min === max) return base;
@@ -121,10 +119,10 @@ export default function Display() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-12">
       <div className="w-full max-w-full">
-        <h1 className="text-4xl font-bold mb-4">플레이어 점수 보드</h1>
-        <p className="text-slate-400 text-base mb-8">
-          {connected ? (hasData ? "발행된 경기 기준 집계 (합산 점수 순)" : "연결됨 · 발행된 경기가 없습니다") : "연결 대기 중…"}
-        </p>
+        <header className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2">플레이어 점수 보드</h1>
+          <p className="text-slate-400 text-base">광안점에서만 시범 운영중인 기능입니다</p>
+        </header>
 
         {!hasData && (
           <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-16 text-center text-slate-400 text-xl">
@@ -138,17 +136,20 @@ export default function Display() {
             className="rounded-2xl border-2 border-white/10 bg-white/5 overflow-y-auto overflow-x-auto"
             style={{ maxHeight: "calc(100vh - 14rem)" }}
           >
-            <table className="w-full min-w-[960px]">
+            <table
+              className="w-full min-w-[960px] table-fixed"
+              style={{ fontSize: "clamp(0.65rem, 2.34vw + 0.65rem, 1.95rem)" }}
+            >
               <thead className="sticky top-0 bg-slate-900/95 z-10">
                 <tr className="border-b-2 border-white/10 text-slate-400">
-                  <th className="py-6 px-6 font-medium text-center text-2xl">이름</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">합산 킬</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">합산 데스</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">평균 명중률</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">평균 데미지</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">총합 데미지</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">승률</th>
-                  <th className="py-6 px-6 font-medium text-center text-xs">합산 점수</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">이름</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 킬</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 데스</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">평균 명중률</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">평균 데미지</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">총합 데미지</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">승률</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 점수</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,14 +161,14 @@ export default function Display() {
                   const winRateDisp = r.winRate > 0 ? `${r.winRate.toFixed(1)}%` : "0%";
                   return (
                     <tr key={p.deviceId} className="border-b-2 border-white/5 hover:bg-white/5">
-                      <td className="py-4 px-6 font-medium text-center truncate max-w-[240px] text-2xl">{p.name}</td>
-                      <td className={`${getCellClass(0, r.kills, String(r.kills))} text-xs`}>{r.kills}</td>
-                      <td className={`${getCellClass(1, r.deaths, String(r.deaths))} text-xs`}>{r.deaths}</td>
-                      <td className={`${getCellClass(2, r.avgAccuracy, avgAccDisp)} text-xs`}>{avgAccDisp}</td>
-                      <td className={`${getCellClass(3, r.avgDamage, avgDmgDisp === "-" ? "-" : String(avgDmgDisp))} text-xs`}>{avgDmgDisp}</td>
-                      <td className={`${getCellClass(4, r.totalDamage, totalDmgDisp === "-" ? "-" : String(totalDmgDisp))} text-xs`}>{totalDmgDisp}</td>
-                      <td className={`${getCellClass(5, r.winRate, winRateDisp)} text-xs`}>{winRateDisp}</td>
-                      <td className={`${getCellClass(6, r.totalScore, String(r.totalScore))} text-xs font-semibold`}>{r.totalScore}</td>
+                      <td className="py-4 px-2 font-medium text-center truncate whitespace-nowrap">{p.name}</td>
+                      <td className={`${getCellClass(0, r.kills, String(r.kills))} px-2 whitespace-nowrap`}>{r.kills}</td>
+                      <td className={`${getCellClass(1, r.deaths, String(r.deaths))} px-2 whitespace-nowrap`}>{r.deaths}</td>
+                      <td className={`${getCellClass(2, r.avgAccuracy, avgAccDisp)} px-2 whitespace-nowrap`}>{avgAccDisp}</td>
+                      <td className={`${getCellClass(3, r.avgDamage, avgDmgDisp === "-" ? "-" : String(avgDmgDisp))} px-2 whitespace-nowrap`}>{avgDmgDisp}</td>
+                      <td className={`${getCellClass(4, r.totalDamage, totalDmgDisp === "-" ? "-" : String(totalDmgDisp))} px-2 whitespace-nowrap`}>{totalDmgDisp}</td>
+                      <td className={`${getCellClass(5, r.winRate, winRateDisp)} px-2 whitespace-nowrap`}>{winRateDisp}</td>
+                      <td className={`${getCellClass(6, r.totalScore, String(r.totalScore))} px-2 whitespace-nowrap font-semibold`}>{r.totalScore}</td>
                     </tr>
                   );
                 })}
