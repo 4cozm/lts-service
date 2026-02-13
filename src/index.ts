@@ -22,9 +22,11 @@ async function main() {
   const bridgePath = path.join(process.cwd(), "ingest-bridge");
   const child = spawn("dotnet", ["run", "--project", bridgePath], {
     cwd: process.cwd(),
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
   });
+  child.stdout?.on("data", (chunk: Buffer) => process.stdout.write(chunk));
+  child.stderr?.on("data", (chunk: Buffer) => process.stderr.write(chunk));
   child.on("error", (err) => log.warn(`경기 수집 브릿지 실행 오류: ${err}`));
   child.on("exit", (code, signal) => {
     if (code != null && code !== 0) log.warn(`경기 수집 브릿지 종료 (코드 ${code})`);
