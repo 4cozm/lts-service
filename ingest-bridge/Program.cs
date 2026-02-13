@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using DotNetEnv;
@@ -20,6 +22,7 @@ namespace LtsIngestBridge
         private const string RedisConnection = "127.0.0.1:6379";
         /// <summary>이미 스트림에 푸시한 경기 Id 집합. 멱등 전달을 위해 새 경기만 푸시.</summary>
         private const string ArenaPushedSetKey = "checkpoint:arena:pushed";
+        private const int DefaultGuestApiPort = 5099;
 
         private static int Main(string[] args)
         {
@@ -35,6 +38,20 @@ namespace LtsIngestBridge
             {
                 PrintUsage();
                 return 2;
+            }
+
+            string? playerDbPath = Environment.GetEnvironmentVariable("LITEDB_PLAYER_PATH")?.Trim();
+            if (!string.IsNullOrWhiteSpace(playerDbPath))
+            {
+                CleanupExpiredGuests(playerDbPath);
+                int guestPort = int.TryParse(Environment.GetEnvironmentVariable("GUEST_API_PORT"), out var p) ? p : DefaultGuestApiPort;
+                var guestApiThread = new Thread(() => RunGuestApiLoop(playerDbPath, guestPort))
+                {
+                    IsBackground = true,
+                    Name = "GuestApi"
+                };
+                guestApiThread.Start();
+                Console.WriteLine($"[게스트 API] http://127.0.0.1:{guestPort}/internal/guest (LiteDB player: {playerDbPath})");
             }
 
             string? passwordRaw = Environment.GetEnvironmentVariable("LITEDB_PASSWORD");
@@ -550,6 +567,163 @@ namespace LtsIngestBridge
             if (p.ValueKind == STJ.JsonValueKind.True) return true;
             if (p.ValueKind == STJ.JsonValueKind.False) return false;
             return null;
+        }
+
+        /// <summary>LITEDB_PLAYER_PATH의 player 컬렉션에서 Kind==Guest, CreatedAt>=2026, 7일 경과한 문서 삭제.</summary>
+        private static void CleanupExpiredGuests(string playerDbPath)
+        {
+            if (!File.Exists(playerDbPath))
+                return;
+            try
+            {
+                var cutoff = DateTime.UtcNow.AddDays(-7);
+                var year2026 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                using var db = new LiteDatabase($"Filename={playerDbPath};");
+                var col = db.GetCollection("player");
+                var toDelete = col.Find(Query.And(
+                    Query.EQ("Kind", "Guest"),
+                    Query.GTE("CreatedAt", year2026),
+                    Query.LT("CreatedAt", cutoff)
+                )).ToList();
+                foreach (var doc in toDelete)
+                {
+                    var id = doc["_id"];
+                    col.Delete(id);
+                    Console.WriteLine($"[게스트 정리] 삭제 _id={id}");
+                }
+                if (toDelete.Count > 0)
+                    Console.WriteLine($"[게스트 정리] 7일 경과 게스트 {toDelete.Count}건 삭제 완료");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[게스트 정리] 오류: {ex.Message}");
+            }
+        }
+
+        private static void RunGuestApiLoop(string playerDbPath, int port)
+        {
+            var prefix = $"http://127.0.0.1:{port}/";
+            try
+            {
+                using var listener = new HttpListener();
+                listener.Prefixes.Add(prefix);
+                listener.Start();
+                while (true)
+                {
+                    var ctx = listener.GetContext();
+                    try
+                    {
+                        if (ctx.Request.HttpMethod == "POST" &&
+                            ctx.Request.Url?.AbsolutePath.TrimEnd('/').EndsWith("/internal/guest", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            using var reader = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding);
+                            var body = reader.ReadToEnd();
+                            string? nickname = null;
+                            if (!string.IsNullOrWhiteSpace(body))
+                            {
+                                using var doc = STJ.JsonDocument.Parse(body);
+                                if (doc.RootElement.TryGetProperty("nickname", out var prop))
+                                    nickname = prop.GetString()?.Trim();
+                            }
+                            if (string.IsNullOrEmpty(nickname))
+                            {
+                                ctx.Response.StatusCode = 400;
+                                WriteJson(ctx.Response, new { error = "nickname required" });
+                                continue;
+                            }
+                            var id = AddGuestInPlayerDb(playerDbPath, nickname);
+                            ctx.Response.StatusCode = 200;
+                            WriteJson(ctx.Response, new { id });
+                        }
+                        else
+                        {
+                            ctx.Response.StatusCode = 404;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[게스트 API] 오류: {ex.Message}");
+                        ctx.Response.StatusCode = 500;
+                        WriteJson(ctx.Response, new { error = ex.Message });
+                    }
+                    finally
+                    {
+                        ctx.Response.Close();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[게스트 API] 리스너 오류: {ex.Message}");
+            }
+        }
+
+        private static void WriteJson(HttpListenerResponse response, object obj)
+        {
+            response.ContentType = "application/json; charset=utf-8";
+            var json = STJ.JsonSerializer.Serialize(obj);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            response.ContentLength64 = bytes.Length;
+            response.OutputStream.Write(bytes, 0, bytes.Length);
+        }
+
+        /// <summary>player 컬렉션에 게스트 추가. 기존 음수 ID Min()-1 로 새 ID 부여.</summary>
+        private static int AddGuestInPlayerDb(string playerDbPath, string nickname)
+        {
+            using var db = new LiteDatabase($"Filename={playerDbPath};");
+            var col = db.GetCollection("player");
+            var ids = col.FindAll()
+                .Select(d => d["_id"].AsInt32)
+                .Where(x => x < 0)
+                .ToList();
+            int newId = ids.Count > 0 ? ids.Min() - 1 : -1;
+            var now = DateTime.UtcNow;
+
+            var doc = new BsonDocument
+            {
+                ["_id"] = newId,
+                ["Kind"] = "Guest",
+                ["Nickname"] = nickname,
+                ["FullName"] = nickname,
+                ["FirstName"] = nickname,
+                ["LastName"] = BsonValue.Null,
+                ["CreatedAt"] = now,
+                ["RegisteredAt"] = now,
+                ["Wins"] = 0,
+                ["Loses"] = 0,
+                ["TotalGames"] = 0,
+                ["Kills"] = 0,
+                ["Deaths"] = 0,
+                ["KillsToDeath"] = 0.0,
+                ["Accuracy"] = 0
+            };
+
+            var profile = new Dictionary<string, object?>
+            {
+                ["FirstName"] = nickname,
+                ["LastName"] = "",
+                ["CreatedAt"] = DateTime.SpecifyKind(now, DateTimeKind.Utc).ToLocalTime().ToString("o"),
+                ["RegisteredAt"] = DateTime.SpecifyKind(now, DateTimeKind.Utc).ToLocalTime().ToString("o"),
+                ["Nickname"] = nickname,
+                ["IsMale"] = true,
+                ["ZipCode"] = null,
+                ["AvatarUrl"] = null
+            };
+            var stats = new Dictionary<string, object?>
+            {
+                ["Wins"] = 0, ["Loses"] = 0, ["Kills"] = 0, ["Deaths"] = 0, ["Shots"] = 0, ["OutHits"] = 0,
+                ["TotalGames"] = 0, ["MaxConsecutiveKills"] = 0, ["BattleCoinsSpent"] = 0, ["KillsToDeath"] = 0.0, ["Accuracy"] = 0
+            };
+            var stored = new Dictionary<string, object?>
+            {
+                ["Id"] = newId,
+                ["Kind"] = 0,
+                ["Profile"] = profile,
+                ["Statistics"] = stats
+            };
+            doc["SerializedStoredItem"] = STJ.JsonSerializer.Serialize(stored);
+            col.Insert(doc);
+            return newId;
         }
 
         private static IEnumerable<string> BuildConnectionStrings(string dbPath, string? password)

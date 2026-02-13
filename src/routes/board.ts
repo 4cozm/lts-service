@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRedis } from "../redis.js";
-import { getTodayBoardKey, getTodayDateString } from "../lib/boardKey.js";
+import { getTodayBoardKey, getTodayDateString, isCreatedTodayKst } from "../lib/boardKey.js";
 import { broadcastDisplay } from "../displayWs.js";
 import {
   aggregatePlayersFromMatches,
@@ -79,8 +79,9 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
         }
       }
     }
+    const todayOnly = entries.filter((e) => isCreatedTodayKst(e.createdAt ?? ""));
     const byStatus = { waiting: [] as typeof entries, playing: [] as typeof entries, done: [] as typeof entries };
-    for (const e of entries) {
+    for (const e of todayOnly) {
       byStatus[e.status].push(e);
     }
     return reply.send(byStatus);

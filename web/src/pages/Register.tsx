@@ -157,6 +157,7 @@ export default function Register() {
             className="space-y-4"
           >
             <p className="text-slate-400 text-sm">닉네임만 입력</p>
+            <p className="text-slate-500 text-xs">7일 후 자동 삭제 · 영어만 가능</p>
             <input
               type="text"
               placeholder="닉네임"

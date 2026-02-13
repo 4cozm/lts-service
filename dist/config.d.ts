@@ -9,6 +9,8 @@ declare const envSchema: z.ZodObject<{
     JWT_SECRET: z.ZodString;
     JWT_EXPIRES_IN: z.ZodDefault<z.ZodString>;
     REDIS_URL: z.ZodString;
+    /** 게스트 생성 API (ingest-bridge). 예: http://127.0.0.1:5099 */
+    GUEST_API_URL: z.ZodOptional<z.ZodString>;
     FIREBASE_PROJECT_ID: z.ZodOptional<z.ZodString>;
     FIREBASE_SERVICE_ACCOUNT_PATH: z.ZodOptional<z.ZodString>;
     FIREBASE_SYNC_INTERVAL_MS: z.ZodOptional<z.ZodNumber>;
@@ -23,6 +25,7 @@ declare const envSchema: z.ZodObject<{
     JWT_SECRET: string;
     JWT_EXPIRES_IN: string;
     REDIS_URL: string;
+    GUEST_API_URL?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
     FIREBASE_SYNC_INTERVAL_MS?: number | undefined;
@@ -37,6 +40,7 @@ declare const envSchema: z.ZodObject<{
     BIND_HOST?: string | undefined;
     INGEST_STREAM_KEY?: string | undefined;
     JWT_EXPIRES_IN?: string | undefined;
+    GUEST_API_URL?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
     FIREBASE_SYNC_INTERVAL_MS?: number | undefined;
@@ -53,6 +57,7 @@ export declare const config: {
     JWT_SECRET: string;
     JWT_EXPIRES_IN: string;
     REDIS_URL: string;
+    GUEST_API_URL?: string | undefined;
     FIREBASE_PROJECT_ID?: string | undefined;
     FIREBASE_SERVICE_ACCOUNT_PATH?: string | undefined;
     FIREBASE_SYNC_INTERVAL_MS?: number | undefined;

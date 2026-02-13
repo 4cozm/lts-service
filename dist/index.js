@@ -20,18 +20,29 @@ async function main() {
     const bridgePath = path.join(process.cwd(), "ingest-bridge");
     const child = spawn("dotnet", ["run", "--project", bridgePath], {
         cwd: process.cwd(),
-        stdio: "inherit",
+        stdio: ["ignore", "pipe", "pipe"],
         env: process.env,
     });
-    child.on("error", (err) => log.warn({ err: String(err), message: "ingest-bridge spawn error" }));
+    child.stdout?.on("data", (chunk) => process.stdout.write(chunk));
+    child.stderr?.on("data", (chunk) => process.stderr.write(chunk));
+    child.on("error", (err) => log.warn(`경기 수집 브릿지 실행 오류: ${err}`));
     child.on("exit", (code, signal) => {
         if (code != null && code !== 0)
-            log.warn({ code, message: "ingest-bridge exited" });
+            log.warn(`경기 수집 브릿지 종료 (코드 ${code})`);
         if (signal)
-            log.warn({ signal, message: "ingest-bridge killed" });
+            log.warn(`경기 수집 브릿지 시그널 종료: ${signal}`);
     });
+    function shutdownBridgeThenExit(signal) {
+        if (!child.killed) {
+            child.kill(signal);
+        }
+        process.exit(0);
+    }
+    process.on("SIGINT", () => shutdownBridgeThenExit("SIGINT"));
+    process.on("SIGTERM", () => shutdownBridgeThenExit("SIGTERM"));
     process.on("exit", () => {
-        child.kill();
+        if (!child.killed)
+            child.kill();
     });
     // #region agent log
     fetch(DEBUG_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: "index.ts:before listen", message: "before app.listen", data: { port: config.PORT }, timestamp: Date.now(), sessionId: "debug-session", hypothesisId: "H5" }) }).catch(() => { });

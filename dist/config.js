@@ -14,6 +14,8 @@ const envSchema = z.object({
     JWT_SECRET: z.string().min(1),
     JWT_EXPIRES_IN: z.string().default("7d"),
     REDIS_URL: z.string().url(),
+    /** 게스트 생성 API (ingest-bridge). 예: http://127.0.0.1:5099 */
+    GUEST_API_URL: z.string().url().optional(),
     FIREBASE_PROJECT_ID: z.string().optional(),
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
     FIREBASE_SYNC_INTERVAL_MS: z.coerce.number().optional(),
@@ -30,6 +32,7 @@ function loadEnv() {
         JWT_SECRET: process.env.JWT_SECRET,
         JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
         REDIS_URL: process.env.REDIS_URL,
+        GUEST_API_URL: process.env.GUEST_API_URL,
         FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
         FIREBASE_SERVICE_ACCOUNT_PATH: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
         FIREBASE_SYNC_INTERVAL_MS: process.env.FIREBASE_SYNC_INTERVAL_MS,

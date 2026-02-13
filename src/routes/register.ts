@@ -1,13 +1,16 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRedis } from "../redis.js";
-import { toNickKey } from "../lib/nickKey.js";
+import { toNickKey, validateGuestNickname } from "../lib/nickKey.js";
 import { getTodayBoardKey } from "../lib/boardKey.js";
+import { config } from "../config.js";
 
 const NICK_KEY_SET = "nickname:keys";
+const NICKNAME_GUEST_PREFIX = "nickname:guest:";
 const PHONE_SET = "phone:set";
 const GUEST_PREFIX = "guest:";
 const MEMBER_KEY_PREFIX = "member:";
 const MEMBER_ID_PREFIX = "mem_";
+const GUEST_REDIS_TTL_SECONDS = 7 * 24 * 3600; // 7 days
 
 async function requireStaff(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
@@ -34,23 +37,56 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Body: { nickname: string } }>, reply: FastifyReply) => {
-      const nickname = req.body.nickname?.trim();
-      if (!nickname || nickname.length < 1) {
-        return reply.status(400).send({ error: "Nickname required" });
+      const raw = req.body.nickname ?? "";
+      const validation = validateGuestNickname(raw);
+      if (!validation.ok) {
+        return reply.status(400).send({ error: validation.error });
       }
+      const nickname = validation.normalized;
       const nickKey = toNickKey(nickname);
       const redis = getRedis();
-      const exists = await redis.sismember(NICK_KEY_SET, nickKey);
-      if (exists) {
+      const memberTaken = await redis.sismember(NICK_KEY_SET, nickKey);
+      if (memberTaken) {
         return reply.status(409).send({ error: "Nickname already taken" });
       }
-      const id = `${GUEST_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      await redis.sadd(NICK_KEY_SET, nickKey);
-      await redis.set(`guest:${id}`, JSON.stringify({ id, nickname, nickKey, createdAt: new Date().toISOString() }));
+      const guestTaken = await redis.get(`${NICKNAME_GUEST_PREFIX}${nickKey}`);
+      if (guestTaken) {
+        return reply.status(409).send({ error: "Nickname already taken" });
+      }
+      const guestApiUrl = config.GUEST_API_URL;
+      if (!guestApiUrl) {
+        return reply.status(503).send({ error: "Guest registration unavailable (GUEST_API_URL not set)" });
+      }
+      let id: number;
+      try {
+        const res = await fetch(`${guestApiUrl.replace(/\/$/, "")}/internal/guest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname }),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string };
+          return reply.status(res.status).send({ error: err.error ?? res.statusText });
+        }
+        const data = (await res.json()) as { id: number };
+        id = data.id;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Guest API request failed";
+        return reply.status(502).send({ error: msg });
+      }
+      const idStr = String(id);
+      const createdAt = new Date().toISOString();
+      await redis.set(
+        `${GUEST_PREFIX}${id}`,
+        JSON.stringify({ id: idStr, nickname, nickKey, createdAt }),
+        "EX",
+        GUEST_REDIS_TTL_SECONDS
+      );
+      await redis.set(`${NICKNAME_GUEST_PREFIX}${nickKey}`, idStr, "EX", GUEST_REDIS_TTL_SECONDS);
       const boardKey = getTodayBoardKey();
-      await redis.sadd(`${boardKey}:waiting`, id);
-      await redis.set(`${boardKey}:entry:${id}`, JSON.stringify({ id, nickname, createdAt: new Date().toISOString() }));
-      return reply.send({ id, nickname });
+      await redis.sadd(`${boardKey}:waiting`, idStr);
+      await redis.set(`${boardKey}:entry:${idStr}`, JSON.stringify({ id: idStr, nickname, createdAt }));
+      return reply.send({ id: idStr, nickname });
     }
   );
 
