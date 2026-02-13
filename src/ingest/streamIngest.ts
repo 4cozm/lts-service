@@ -60,13 +60,13 @@ export function startIngestFromStream(log: {
         await setMatchStreamLastId(nextLastId);
         lastId = nextLastId;
       } catch (e) {
-        log.warn({ err: e });
+        log.warn(`경기 수집 스트림 오류: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }
 
   run();
-  log.info({ streamKey, message: "ingest from Redis Stream started" });
+  log.info(`경기 수집 스트림 구독 시작 (${streamKey})`);
 }
 
 function getField(fields: string[], name: string): string | null {

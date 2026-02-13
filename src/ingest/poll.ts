@@ -18,7 +18,7 @@ export async function processNewMatches(
     pipeline.set(`${MATCHES_KEY_PREFIX}${id}`, JSON.stringify(m));
   }
   await pipeline.exec();
-  log.info({ count: matches.length, ids: matches.map((m) => m.Id) });
+  log.info(`경기 ${matches.length}건 Redis 저장 (ID: ${matches.map((m) => m.Id).join(", ")})`);
 }
 
 /**
@@ -29,6 +29,6 @@ export async function onMatchFileChanged(log: { info: (o: unknown) => void }): P
   if (changed && snapshot.length > 0) {
     const redis = getRedis();
     await redis.set("players:snapshot", JSON.stringify(snapshot));
-    log.info({ playersCount: snapshot.length, message: "players snapshot updated" });
+    log.info(`플레이어 스냅샷 갱신: ${snapshot.length}명`);
   }
 }

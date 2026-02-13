@@ -25,10 +25,10 @@ async function main() {
     stdio: "inherit",
     env: process.env,
   });
-  child.on("error", (err) => log.warn({ err: String(err), message: "ingest-bridge spawn error" }));
+  child.on("error", (err) => log.warn(`경기 수집 브릿지 실행 오류: ${err}`));
   child.on("exit", (code, signal) => {
-    if (code != null && code !== 0) log.warn({ code, message: "ingest-bridge exited" });
-    if (signal) log.warn({ signal, message: "ingest-bridge killed" });
+    if (code != null && code !== 0) log.warn(`경기 수집 브릿지 종료 (코드 ${code})`);
+    if (signal) log.warn(`경기 수집 브릿지 시그널 종료: ${signal}`);
   });
   process.on("exit", () => {
     child.kill();

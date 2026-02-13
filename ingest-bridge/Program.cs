@@ -43,11 +43,8 @@ namespace LtsIngestBridge
             string collectionName = Environment.GetEnvironmentVariable("GAME_COLLECTION_NAME") ?? DefaultCollectionName;
             int pollMs = int.TryParse(Environment.GetEnvironmentVariable("POLL_INTERVAL_MS"), out var ms) ? ms : DefaultPollIntervalMs;
 
-            Console.WriteLine($"Redis: {RedisConnection}");
-            Console.WriteLine($"Stream: {streamKey}");
-            Console.WriteLine($"LiteDB (arena): {dbPath}");
-            Console.WriteLine($"Poll interval: {pollMs}ms");
-            Console.WriteLine("Press Ctrl+C to stop.");
+            Console.WriteLine($"[경기 수집] Redis: {RedisConnection}, 스트림: {streamKey}");
+            Console.WriteLine($"[경기 수집] LiteDB(경기 DB): {dbPath}, 폴링 간격: {pollMs}ms");
             Console.WriteLine();
 
             try
@@ -73,13 +70,13 @@ namespace LtsIngestBridge
                         {
                             int written = PushSlimGameResultsToStream(redisDb, dbPath, password, collectionName, streamKey);
                             if (written > 0)
-                                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Pushed {written} match(es) to stream.");
+                                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 경기 {written}건 스트림 전송 완료");
                             lastSize = currentSize;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: {ex.Message}");
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 오류: {ex.Message}");
                     }
 
                     Thread.Sleep(pollMs);
@@ -87,7 +84,7 @@ namespace LtsIngestBridge
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Fatal: {ex}");
+                Console.WriteLine($"치명적 오류: {ex.Message}");
                 return 1;
             }
         }
@@ -147,7 +144,7 @@ namespace LtsIngestBridge
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"LiteDB open failed: {ex.Message}");
+                    Console.WriteLine($"[경기 수집] LiteDB 열기 실패: {ex.Message}");
                 }
             }
 
@@ -545,11 +542,9 @@ namespace LtsIngestBridge
 
         private static void PrintUsage()
         {
-            Console.WriteLine("LtsIngestBridge - arena.data to Redis Stream");
-            Console.WriteLine();
-            Console.WriteLine("Usage:");
-            Console.WriteLine(@"  dotnet run -- ""<arena.data 경로>""");
-            Console.WriteLine("  Or set LITEDB_ARENA_PATH (or LITEDB_PATH) in .env and run without args (e.g. from Node).");
+            Console.WriteLine("경기 수집 브릿지 (LiteDB → Redis 스트림)");
+            Console.WriteLine("  dotnet run -- \"<arena.data 경로>\"");
+            Console.WriteLine("  또는 .env에 LITEDB_ARENA_PATH 설정 후 인자 없이 실행");
         }
     }
 }
