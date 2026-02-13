@@ -28,6 +28,7 @@ export default function Display() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [connected, setConnected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomPauseUntilRef = useRef<number>(0);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -58,15 +59,23 @@ export default function Display() {
     };
   }, []);
 
-  // 자동 스크롤: 컨텐츠가 화면 밖으로 넘치면 천천히 아래로 스크롤 후 맨 위로
+  // 자동 스크롤: 컨텐츠가 화면 밖으로 넘치면 아래로 스크롤 → 맨 아래에서 2초 멈춤 → 맨 위로
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    bottomPauseUntilRef.current = 0;
     const tick = (): void => {
       if (el.scrollHeight <= el.clientHeight) return;
-      el.scrollTop += 1;
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) {
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+      if (atBottom) {
+        if (bottomPauseUntilRef.current === 0)
+          bottomPauseUntilRef.current = Date.now() + 2000;
+        if (Date.now() < bottomPauseUntilRef.current) return;
         el.scrollTop = 0;
+        bottomPauseUntilRef.current = 0;
+      } else {
+        bottomPauseUntilRef.current = 0;
+        el.scrollTop += 1;
       }
     };
     const id = setInterval(tick, 80);
@@ -140,7 +149,10 @@ export default function Display() {
               className="w-full min-w-[960px] table-fixed"
               style={{ fontSize: "clamp(0.65rem, 2.34vw + 0.65rem, 1.95rem)" }}
             >
-              <thead className="sticky top-0 bg-slate-900/95 z-10">
+              <thead
+                className="sticky top-0 bg-slate-900/95 z-10"
+                style={{ fontSize: "clamp(0.455rem, 1.64vw + 0.455rem, 1.365rem)" }}
+              >
                 <tr className="border-b-2 border-white/10 text-slate-400">
                   <th className="py-6 px-2 font-medium text-center whitespace-nowrap">이름</th>
                   <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 킬</th>
