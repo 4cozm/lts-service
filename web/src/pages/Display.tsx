@@ -58,8 +58,10 @@ export default function Display() {
     };
   }, []);
 
-  // 자동 스크롤: 컨텐츠가 넘치면 천천히 아래로 스크롤 후 맨 위로
+  // 자동 스크롤: 플레이어 5명 초과이고 컨텐츠가 넘칠 때만 천천히 아래로 스크롤 후 맨 위로
   useEffect(() => {
+    const count = payload?.players?.length ?? 0;
+    if (count <= 5) return;
     const el = scrollRef.current;
     if (!el) return;
     const tick = (): void => {
@@ -136,17 +138,17 @@ export default function Display() {
             className="rounded-2xl border-2 border-white/10 bg-white/5 overflow-y-auto overflow-x-auto"
             style={{ maxHeight: "calc(100vh - 14rem)" }}
           >
-            <table className="w-full min-w-[960px] text-2xl">
+            <table className="w-full min-w-[960px]">
               <thead className="sticky top-0 bg-slate-900/95 z-10">
-                <tr className="border-b-2 border-white/10 text-slate-400 text-2xl">
-                  <th className="py-6 px-6 font-medium text-center">이름</th>
-                  <th className="py-6 px-6 font-medium text-center">합산 킬</th>
-                  <th className="py-6 px-6 font-medium text-center">합산 데스</th>
-                  <th className="py-6 px-6 font-medium text-center">평균 명중률</th>
-                  <th className="py-6 px-6 font-medium text-center">평균 데미지</th>
-                  <th className="py-6 px-6 font-medium text-center">총합 데미지</th>
-                  <th className="py-6 px-6 font-medium text-center">승률</th>
-                  <th className="py-6 px-6 font-medium text-center">합산 점수</th>
+                <tr className="border-b-2 border-white/10 text-slate-400">
+                  <th className="py-6 px-6 font-medium text-center text-2xl">이름</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">합산 킬</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">합산 데스</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">평균 명중률</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">평균 데미지</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">총합 데미지</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">승률</th>
+                  <th className="py-6 px-6 font-medium text-center text-xs">합산 점수</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,14 +160,14 @@ export default function Display() {
                   const winRateDisp = r.winRate > 0 ? `${r.winRate.toFixed(1)}%` : "0%";
                   return (
                     <tr key={p.deviceId} className="border-b-2 border-white/5 hover:bg-white/5">
-                      <td className="py-4 px-6 font-medium text-center truncate max-w-[240px]">{p.name}</td>
-                      <td className={getCellClass(0, r.kills, String(r.kills))}>{r.kills}</td>
-                      <td className={getCellClass(1, r.deaths, String(r.deaths))}>{r.deaths}</td>
-                      <td className={getCellClass(2, r.avgAccuracy, avgAccDisp)}>{avgAccDisp}</td>
-                      <td className={getCellClass(3, r.avgDamage, avgDmgDisp === "-" ? "-" : String(avgDmgDisp))}>{avgDmgDisp}</td>
-                      <td className={getCellClass(4, r.totalDamage, totalDmgDisp === "-" ? "-" : String(totalDmgDisp))}>{totalDmgDisp}</td>
-                      <td className={getCellClass(5, r.winRate, winRateDisp)}>{winRateDisp}</td>
-                      <td className={`${getCellClass(6, r.totalScore, String(r.totalScore))} font-semibold`}>{r.totalScore}</td>
+                      <td className="py-4 px-6 font-medium text-center truncate max-w-[240px] text-2xl">{p.name}</td>
+                      <td className={`${getCellClass(0, r.kills, String(r.kills))} text-xs`}>{r.kills}</td>
+                      <td className={`${getCellClass(1, r.deaths, String(r.deaths))} text-xs`}>{r.deaths}</td>
+                      <td className={`${getCellClass(2, r.avgAccuracy, avgAccDisp)} text-xs`}>{avgAccDisp}</td>
+                      <td className={`${getCellClass(3, r.avgDamage, avgDmgDisp === "-" ? "-" : String(avgDmgDisp))} text-xs`}>{avgDmgDisp}</td>
+                      <td className={`${getCellClass(4, r.totalDamage, totalDmgDisp === "-" ? "-" : String(totalDmgDisp))} text-xs`}>{totalDmgDisp}</td>
+                      <td className={`${getCellClass(5, r.winRate, winRateDisp)} text-xs`}>{winRateDisp}</td>
+                      <td className={`${getCellClass(6, r.totalScore, String(r.totalScore))} text-xs font-semibold`}>{r.totalScore}</td>
                     </tr>
                   );
                 })}

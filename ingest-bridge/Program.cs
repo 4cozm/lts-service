@@ -103,6 +103,13 @@ namespace LtsIngestBridge
                     {
                         if (!TryGetSerializedStoredItem(doc, out var storedJson) || string.IsNullOrWhiteSpace(storedJson))
                             continue;
+                        if (TryGetIdAndFinishTimeFromStored(storedJson!, out var earlyId, out var finishTime) &&
+                            string.IsNullOrWhiteSpace(finishTime))
+                        {
+                            if (!string.IsNullOrWhiteSpace(earlyId))
+                                Console.WriteLine($"[경기 수집] 경기 중 (FinishTime 없음), 스킵: Id={earlyId}");
+                            continue;
+                        }
                         if (!TryBuildSlimSummary(storedJson!, out var summaryJson))
                             continue;
 
@@ -179,6 +186,23 @@ namespace LtsIngestBridge
             }
             catch { /* ignore */ }
             return null;
+        }
+
+        /// <summary>저장된 경기 JSON에서 Id와 FinishTime만 빠르게 읽음. 경기 중(FinishTime 없음) 판별용.</summary>
+        private static bool TryGetIdAndFinishTimeFromStored(string storedJson, out string? id, out string? finishTime)
+        {
+            id = null;
+            finishTime = null;
+            try
+            {
+                using var j = STJ.JsonDocument.Parse(storedJson);
+                var root = j.RootElement;
+                if (root.ValueKind != STJ.JsonValueKind.Object) return false;
+                id = GetString(root, "Id");
+                finishTime = GetString(root, "FinishTime");
+                return true;
+            }
+            catch { return false; }
         }
 
         private static bool TryGetSerializedStoredItem(BsonDocument doc, out string? storedJson)
