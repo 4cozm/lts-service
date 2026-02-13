@@ -9,6 +9,11 @@ export type AggregatedPlayer = {
   totalScore: number;
   wins: number;
   gamesPlayed: number;
+  totalKills: number;
+  totalDeaths: number;
+  totalShots: number;
+  totalHits: number;
+  totalDamage: number;
 };
 
 export type PublishedPayload = {
@@ -17,12 +22,31 @@ export type PublishedPayload = {
   updatedAt: string;
 };
 
+type PlayerStats = {
+  Score?: number | null;
+  Deaths?: number | null;
+  Shots?: number | null;
+  Hits?: number | null;
+  TotalDamage?: number | null;
+  Kills?: number | null;
+};
+
 /**
- * 여러 경기에서 플레이어별 총점·승리횟수·참가 경기 수 집계.
+ * 여러 경기에서 플레이어별 총점·승리·킬/데스/명중/데미지 집계.
  * 플레이어 식별: DeviceId (fallback PreconfiguredDeviceId). 이름은 마지막 등장 PlayerName.
  */
 export function aggregatePlayersFromMatches(matches: MatchLine[]): AggregatedPlayer[] {
-  const byDevice = new Map<number, { name: string; totalScore: number; wins: number; gamesPlayed: number }>();
+  const byDevice = new Map<number, {
+    name: string;
+    totalScore: number;
+    wins: number;
+    gamesPlayed: number;
+    totalKills: number;
+    totalDeaths: number;
+    totalShots: number;
+    totalHits: number;
+    totalDamage: number;
+  }>();
 
   for (const match of matches) {
     const winSide = match.WinSide ?? (match as Record<string, unknown>).winSide as string | undefined;
@@ -30,7 +54,7 @@ export function aggregatePlayersFromMatches(matches: MatchLine[]): AggregatedPla
     if (!teams || typeof teams !== "object") continue;
 
     for (const [teamKey, team] of Object.entries(teams)) {
-      const t = team as { Players?: Array<{ PlayerName?: string | null; DeviceId?: number | null; PreconfiguredDeviceId?: number | null; Statistics?: { Score?: number | null } }> };
+      const t = team as { Players?: Array<{ PlayerName?: string | null; DeviceId?: number | null; PreconfiguredDeviceId?: number | null; Statistics?: PlayerStats }> };
       const players = t?.Players ?? [];
       if (!Array.isArray(players)) continue;
 
@@ -39,7 +63,13 @@ export function aggregatePlayersFromMatches(matches: MatchLine[]): AggregatedPla
         if (deviceId == null) continue;
 
         const name = (p.PlayerName ?? "").trim() || `#${deviceId}`;
-        const score = typeof p.Statistics?.Score === "number" ? p.Statistics.Score : 0;
+        const st = p.Statistics;
+        const score = typeof st?.Score === "number" ? st.Score : 0;
+        const kills = typeof st?.Kills === "number" ? st.Kills : 0;
+        const deaths = typeof st?.Deaths === "number" ? st.Deaths : 0;
+        const shots = typeof st?.Shots === "number" ? st.Shots : 0;
+        const hits = typeof st?.Hits === "number" ? st.Hits : 0;
+        const damage = typeof st?.TotalDamage === "number" ? st.TotalDamage : 0;
         const won = winSide != null && winSide === teamKey ? 1 : 0;
 
         const cur = byDevice.get(deviceId);
@@ -48,8 +78,23 @@ export function aggregatePlayersFromMatches(matches: MatchLine[]): AggregatedPla
           cur.totalScore += score;
           cur.wins += won;
           cur.gamesPlayed += 1;
+          cur.totalKills += kills;
+          cur.totalDeaths += deaths;
+          cur.totalShots += shots;
+          cur.totalHits += hits;
+          cur.totalDamage += damage;
         } else {
-          byDevice.set(deviceId, { name, totalScore: score, wins: won, gamesPlayed: 1 });
+          byDevice.set(deviceId, {
+            name,
+            totalScore: score,
+            wins: won,
+            gamesPlayed: 1,
+            totalKills: kills,
+            totalDeaths: deaths,
+            totalShots: shots,
+            totalHits: hits,
+            totalDamage: damage,
+          });
         }
       }
     }
@@ -62,6 +107,11 @@ export function aggregatePlayersFromMatches(matches: MatchLine[]): AggregatedPla
       totalScore: v.totalScore,
       wins: v.wins,
       gamesPlayed: v.gamesPlayed,
+      totalKills: v.totalKills,
+      totalDeaths: v.totalDeaths,
+      totalShots: v.totalShots,
+      totalHits: v.totalHits,
+      totalDamage: v.totalDamage,
     }))
     .sort((a, b) => b.totalScore - a.totalScore);
 }
