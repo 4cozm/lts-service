@@ -1,5 +1,7 @@
 # LTS 매장 로컬 서버
 
+**라이선스:** 개발자 허가 없는 상업적 사용 금지. 자세한 내용은 [LICENSE](LICENSE)를 참고하세요.
+
 Fastify + ioredis + firebase-admin + zod 기반 로컬 서버 뼈대.  
 요구사항/아키텍처는 `LTS-local-server-requirements.md`, `LTS-local-server-architecture.md`, `Opus-Bridge-CSharp-Extractor.md` 참고.
 
