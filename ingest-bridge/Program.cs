@@ -581,8 +581,7 @@ namespace LtsIngestBridge
                 using var db = new LiteDatabase($"Filename={playerDbPath};");
                 var col = db.GetCollection("player");
                 var toDelete = col.Find(Query.And(
-                    Query.EQ("Kind", "Guest"),
-                    Query.GTE("CreatedAt", year2026),
+                    Query.And(Query.EQ("Kind", "Guest"), Query.GTE("CreatedAt", year2026)),
                     Query.LT("CreatedAt", cutoff)
                 )).ToList();
                 foreach (var doc in toDelete)
