@@ -7,6 +7,7 @@ const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/f5f9e2b5-6e29-44c2-98b6-e53
 
 let client: Redis | null = null;
 let streamClient: Redis | null = null;
+let boardClient: Redis | null = null;
 
 function createRedisClient(): Redis {
   return new Redis(config.REDIS_URL, {
@@ -53,7 +54,22 @@ export function getRedisStreamClient(): Redis {
   return streamClient;
 }
 
+/** /api/board 전용 연결. 등록·스트림 등 다른 트래픽에 밀리지 않도록 별도 연결 사용. */
+export function getRedisBoardClient(): Redis {
+  if (!boardClient) {
+    boardClient = createRedisClient();
+    boardClient.on("error", (err: Error) => {
+      console.error("[Redis Board] connection error:", (err as NodeJS.ErrnoException)?.code ?? err.message);
+    });
+  }
+  return boardClient;
+}
+
 export async function closeRedis(): Promise<void> {
+  if (boardClient) {
+    await boardClient.quit();
+    boardClient = null;
+  }
   if (streamClient) {
     await streamClient.quit();
     streamClient = null;

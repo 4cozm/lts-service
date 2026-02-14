@@ -163,25 +163,7 @@ export default function Board() {
   }, []);
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Status }) => moveEntry(id, status),
-    onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["board"] });
-      const prev = queryClient.getQueryData<BoardData>(["board"]);
-      if (!prev) return { prev };
-      const idStr = String(id);
-      const next: BoardData = {
-        waiting: (prev.waiting ?? []).filter((e) => String(e.id) !== idStr),
-        playing: (prev.playing ?? []).filter((e) => String(e.id) !== idStr),
-        done: (prev.done ?? []).filter((e) => String(e.id) !== idStr),
-      };
-      const moved = findEntry(prev, idStr);
-      if (moved) next[status].push({ ...moved, status });
-      queryClient.setQueryData(["board"], next);
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.prev) queryClient.setQueryData(["board"], context.prev);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["board"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["board"] }),
   });
 
   const sensors = useSensors(

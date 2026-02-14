@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { getRedis } from "../redis.js";
+import { getRedisBoardClient } from "../redis.js";
 import { getTodayBoardKey, getTodayDateString, isCreatedTodayKst } from "../lib/boardKey.js";
 import { broadcastDisplay } from "../displayWs.js";
 import {
@@ -62,7 +62,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireLocalhost);
 
   app.get("/api/board", async (req: FastifyRequest, reply: FastifyReply) => {
-    const redis = getRedis();
+    const redis = getRedisBoardClient();
     const key = getTodayBoardKey();
     const entries: Array<{ id: string; nickname: string; status: Status; createdAt: string }> = [];
     for (const status of STATUSES) {
@@ -88,7 +88,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/api/board/matches", async (req: FastifyRequest, reply: FastifyReply) => {
-    const redis = getRedis();
+    const redis = getRedisBoardClient();
     const ids = await redis.smembers(MATCH_IDS_SET);
     const todayKst = getTodayDateString();
     const matches: Record<string, unknown>[] = [];
@@ -139,7 +139,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
     async (req: FastifyRequest<{ Params: { id: string }; Body: { status: Status } }>, reply: FastifyReply) => {
       const { id } = req.params;
       const { status } = req.body;
-      const redis = getRedis();
+      const redis = getRedisBoardClient();
       const key = getTodayBoardKey();
       const pipe = redis.pipeline();
       for (const s of STATUSES) {
@@ -164,7 +164,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req: FastifyRequest<{ Body: { id: string; nickname: string } }>, reply: FastifyReply) => {
       const { id, nickname } = req.body;
-      const redis = getRedis();
+      const redis = getRedisBoardClient();
       const key = getTodayBoardKey();
       const createdAt = new Date().toISOString();
       const entry = { id, nickname, status: WAITING, createdAt };
@@ -185,7 +185,7 @@ export async function boardRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req: FastifyRequest<{ Body: { matchIds: string[] } }>, reply: FastifyReply) => {
       const { matchIds } = req.body;
-      const redis = getRedis();
+      const redis = getRedisBoardClient();
       if (!matchIds?.length) {
         return reply.status(400).send({ error: "matchIds required (non-empty array)" });
       }
