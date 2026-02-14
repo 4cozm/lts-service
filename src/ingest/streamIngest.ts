@@ -1,5 +1,5 @@
 import { config } from "../config.js";
-import { getRedis } from "../redis.js";
+import { getRedisStreamClient } from "../redis.js";
 import { getMatchStreamLastId, setMatchStreamLastId } from "./checkpoint.js";
 import { parseMatchLine, type MatchLine } from "./matchSchema.js";
 import { processNewMatches, onMatchFileChanged } from "./poll.js";
@@ -18,11 +18,11 @@ export function startIngestFromStream(log: {
 
   async function run(): Promise<void> {
     let lastId = await getMatchStreamLastId();
-    const redis = getRedis();
+    const streamRedis = getRedisStreamClient();
 
     for (;;) {
       try {
-        const result = await redis.xread(
+        const result = await streamRedis.xread(
           "BLOCK",
           BLOCK_MS,
           "STREAMS",
