@@ -6,6 +6,7 @@ import { config } from "../config.js";
 
 const NICK_KEY_SET = "nickname:keys";
 const NICKNAME_GUEST_PREFIX = "nickname:guest:";
+const GUEST_PENDING_TTL_SECONDS = 60; // 중복 제출 방지용 예약 TTL
 const PHONE_SET = "phone:set";
 const GUEST_PREFIX = "guest:";
 const MEMBER_KEY_PREFIX = "member:";
@@ -22,6 +23,37 @@ async function requireStaff(req: FastifyRequest, reply: FastifyReply): Promise<v
   } catch {
     return reply.status(401).send({ error: "Unauthorized" });
   }
+}
+
+async function runGuestRegistrationInBackground(
+  guestApiUrl: string,
+  nickname: string,
+  nickKey: string,
+  redis: Awaited<ReturnType<typeof getRedis>>
+): Promise<void> {
+  const baseUrl = guestApiUrl.replace(/\/$/, "");
+  const res = await fetch(`${baseUrl}/internal/guest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nickname }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? res.statusText);
+  }
+  const data = (await res.json()) as { id: number };
+  const idStr = String(data.id);
+  const createdAt = new Date().toISOString();
+  await redis.set(
+    `${GUEST_PREFIX}${idStr}`,
+    JSON.stringify({ id: idStr, nickname, nickKey, createdAt }),
+    "EX",
+    GUEST_REDIS_TTL_SECONDS
+  );
+  await redis.set(`${NICKNAME_GUEST_PREFIX}${nickKey}`, idStr, "EX", GUEST_REDIS_TTL_SECONDS);
+  const boardKey = getTodayBoardKey();
+  await redis.sadd(`${boardKey}:waiting`, idStr);
+  await redis.set(`${boardKey}:entry:${idStr}`, JSON.stringify({ id: idStr, nickname, createdAt }));
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -57,36 +89,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       if (!guestApiUrl) {
         return reply.status(503).send({ error: "Guest registration unavailable (GUEST_API_URL not set)" });
       }
-      let id: number;
-      try {
-        const res = await fetch(`${guestApiUrl.replace(/\/$/, "")}/internal/guest`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nickname }),
-        });
-        if (!res.ok) {
-          const err = (await res.json().catch(() => ({}))) as { error?: string };
-          return reply.status(res.status).send({ error: err.error ?? res.statusText });
-        }
-        const data = (await res.json()) as { id: number };
-        id = data.id;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Guest API request failed";
-        return reply.status(502).send({ error: msg });
-      }
-      const idStr = String(id);
-      const createdAt = new Date().toISOString();
-      await redis.set(
-        `${GUEST_PREFIX}${id}`,
-        JSON.stringify({ id: idStr, nickname, nickKey, createdAt }),
-        "EX",
-        GUEST_REDIS_TTL_SECONDS
-      );
-      await redis.set(`${NICKNAME_GUEST_PREFIX}${nickKey}`, idStr, "EX", GUEST_REDIS_TTL_SECONDS);
-      const boardKey = getTodayBoardKey();
-      await redis.sadd(`${boardKey}:waiting`, idStr);
-      await redis.set(`${boardKey}:entry:${idStr}`, JSON.stringify({ id: idStr, nickname, createdAt }));
-      return reply.send({ id: idStr, nickname });
+      await redis.set(`${NICKNAME_GUEST_PREFIX}${nickKey}`, "pending", "EX", GUEST_PENDING_TTL_SECONDS);
+      void runGuestRegistrationInBackground(guestApiUrl, nickname, nickKey, redis).catch((err) => {
+        redis.del(`${NICKNAME_GUEST_PREFIX}${nickKey}`).catch(() => {});
+        req.log?.error?.(err, "guest registration background failed");
+      });
+      return reply.status(202).send({
+        message: "등록 접수됨. 잠시 후 대기열에 반영됩니다.",
+      });
     }
   );
 

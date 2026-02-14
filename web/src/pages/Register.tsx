@@ -59,8 +59,8 @@ export default function Register() {
 
   const guestMutation = useMutation({
     mutationFn: (nick: string) => registerGuest(nick, token!),
-    onSuccess: () => {
-      setSuccess(SUCCESS_MSG);
+    onSuccess: (data: { message?: string }) => {
+      setSuccess(data?.message ?? SUCCESS_MSG);
       setNickname("");
     },
   });

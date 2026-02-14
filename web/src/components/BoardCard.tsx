@@ -10,7 +10,7 @@ type Entry = {
 
 export default function BoardCard({ entry }: { entry: Entry }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: entry.id,
+    id: String(entry.id),
   });
 
   const style = transform
@@ -28,7 +28,7 @@ export default function BoardCard({ entry }: { entry: Entry }) {
       }`}
     >
       <span className="font-medium">{entry.nickname}</span>
-      <span className="text-slate-500 text-xs ml-2">#{entry.id.slice(0, 8)}</span>
+      <span className="text-slate-500 text-xs ml-2">#{String(entry.id).slice(0, 8)}</span>
     </div>
   );
 }

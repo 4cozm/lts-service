@@ -1,5 +1,4 @@
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import BoardCard from "./BoardCard";
 
 type Status = "waiting" | "playing" | "done";
@@ -28,13 +27,11 @@ export default function BoardColumn({ id, title, entries }: Props) {
       }`}
     >
       <h2 className="font-medium text-slate-300 mb-3">{title}</h2>
-      <SortableContext items={entries.map((e) => e.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
-          {entries.map((entry) => (
-            <BoardCard key={entry.id} entry={entry} />
-          ))}
-        </div>
-      </SortableContext>
+      <div className="space-y-2">
+        {entries.map((entry) => (
+          <BoardCard key={entry.id} entry={entry} />
+        ))}
+      </div>
     </div>
   );
 }

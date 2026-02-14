@@ -106,8 +106,9 @@ const COLUMNS: { id: Status; title: string }[] = [
 ];
 
 function findEntry(data: BoardData, id: string): BoardEntry | null {
+  const idStr = String(id);
   for (const col of COLUMNS) {
-    const entry = (data[col.id] ?? []).find((e) => e.id === id);
+    const entry = (data[col.id] ?? []).find((e) => String(e.id) === idStr);
     if (entry) return entry;
   }
   return null;
