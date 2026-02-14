@@ -148,11 +148,23 @@ export default function Board() {
     isLoading: matchesLoading,
     isFetching: matchesFetching,
     refetch: refetchMatches,
-  } =   useQuery({
+  } = useQuery({
     queryKey: ["board-matches"],
     queryFn: fetchBoardMatches,
     refetchInterval: 60 * 1000,
   });
+  const [matchesRefreshing, setMatchesRefreshing] = useState(false);
+  const isRefreshingMatches = matchesRefreshing || matchesFetching;
+
+  async function handleRefetchMatches() {
+    setMatchesRefreshing(true);
+    try {
+      await refetchMatches();
+    } finally {
+      setMatchesRefreshing(false);
+    }
+  }
+
   const toggleMatchSelection = useCallback((id: string) => {
     setSelectedMatchIds((prev) => {
       const next = new Set(prev);
@@ -234,11 +246,11 @@ export default function Board() {
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={matchesFetching}
-              onClick={() => refetchMatches()}
+              disabled={isRefreshingMatches}
+              onClick={handleRefetchMatches}
               className="btn-primary py-2 px-3 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {matchesFetching ? "새로고침 중…" : "새로고침"}
+              {isRefreshingMatches ? "새로고침 중…" : "새로고침"}
             </button>
             <button
               type="button"

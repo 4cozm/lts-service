@@ -120,6 +120,14 @@ export default function Display() {
     if (display === "-") return base;
     const { min, max } = minMax[colIndex];
     if (min === max) return base;
+    const colKey = columns[colIndex];
+    if (colKey === "deaths") {
+      const lessIsBetter = "text-rose-400";
+      const moreIsWorse = "text-sky-400";
+      if (value === min) return `${base} ${lessIsBetter}`;
+      if (value === max) return `${base} ${moreIsWorse}`;
+      return base;
+    }
     if (value === max) return `${base} text-rose-400`;
     if (value === min) return `${base} text-sky-400`;
     return base;
@@ -129,7 +137,6 @@ export default function Display() {
     <div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-12">
       <div className="w-full max-w-full">
         <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">플레이어 점수 보드</h1>
           <p className="text-slate-400 text-base">광안점에서만 시범 운영중인 기능입니다</p>
         </header>
 
@@ -154,14 +161,38 @@ export default function Display() {
                 style={{ fontSize: "clamp(0.455rem, 1.64vw + 0.455rem, 1.365rem)" }}
               >
                 <tr className="border-b-2 border-white/10 text-slate-400">
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">이름</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 킬</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 데스</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">평균 명중률</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">평균 데미지</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">총합 데미지</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">승률</th>
-                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">합산 점수</th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">이름</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Name</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">합산 킬</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Total Kills</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">합산 데스</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Total Deaths</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">평균 명중률</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Avg Accuracy</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">평균 데미지</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Avg Damage</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">총합 데미지</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Total Damage</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">승률</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Win Rate</span>
+                  </th>
+                  <th className="py-6 px-2 font-medium text-center whitespace-nowrap">
+                    <span className="block">합산 점수</span>
+                    <span className="block text-xs font-normal text-slate-500 mt-0.5">Total Score</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
