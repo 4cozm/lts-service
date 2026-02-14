@@ -133,21 +133,22 @@ export default function Display() {
     return base;
   };
 
+  const FOOTER_H = "3.5rem";
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      <main className="flex-1 min-h-0 flex flex-col px-6 pt-8 pb-2">
-        <div className="w-full max-w-full flex-1 min-h-0 flex flex-col">
-          {!hasData && (
-            <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-16 text-center text-slate-400 text-xl flex-1 flex items-center justify-center min-h-[200px]">
-              {connected ? "경기를 선택한 뒤 match 페이지에서 발행해 주세요." : "WebSocket 연결 중…"}
-            </div>
-          )}
+    <div className="min-h-screen bg-slate-950 text-slate-100 px-6 pt-8 pb-14">
+      <div className="w-full max-w-full">
+        {!hasData && (
+          <div className="rounded-2xl border-2 border-white/10 bg-white/5 p-16 text-center text-slate-400 text-xl">
+            {connected ? "경기를 선택한 뒤 match 페이지에서 발행해 주세요." : "WebSocket 연결 중…"}
+          </div>
+        )}
 
-          {hasData && (
-            <div
-              ref={scrollRef}
-              className="rounded-2xl border-2 border-white/10 bg-white/5 overflow-y-auto overflow-x-auto flex-1 min-h-0"
-            >
+        {hasData && (
+          <div
+            ref={scrollRef}
+            className="rounded-2xl border-2 border-white/10 bg-white/5 overflow-y-auto overflow-x-auto"
+            style={{ maxHeight: `calc(100vh - ${FOOTER_H} - 5rem)` }}
+          >
             <table
               className="w-full min-w-[960px] table-fixed"
               style={{ fontSize: "clamp(0.65rem, 2.34vw + 0.65rem, 1.95rem)" }}
@@ -214,10 +215,13 @@ export default function Display() {
               </tbody>
             </table>
           </div>
-          )}
-        </div>
-      </main>
-      <footer className="shrink-0 py-3 text-center text-slate-400 text-sm border-t border-white/10 bg-slate-950">
+        )}
+      </div>
+
+      <footer
+        className="fixed bottom-0 left-0 right-0 py-3 text-center text-slate-400 text-sm border-t border-white/10 bg-slate-950 z-10"
+        style={{ height: FOOTER_H }}
+      >
         광안점에서 시범 운영중인 기능입니다
       </footer>
     </div>
